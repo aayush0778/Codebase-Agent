@@ -20,7 +20,7 @@ DEFAULT_CODEBASE_PATH = str(PROJECT_ROOT / "sample_codebase")
 # Ollama Models
 # ──────────────────────────────────────────────
 EMBEDDING_MODEL = "nomic-embed-text"
-LLM_MODEL = "llama3"                 # alternatives: "codellama:13b", "deepseek-coder:6.7b"
+LLM_MODEL = "devstral:24b"             # alternatives: "llama3", "codellama:13b", "deepseek-coder:6.7b"
 LLM_REQUEST_TIMEOUT = 300.0          # seconds (higher for CPU-only inference)
 
 # ──────────────────────────────────────────────

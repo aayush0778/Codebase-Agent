@@ -146,36 +146,45 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
+/* ═══════════════════════════════════════════════
+   DESIGN TOKENS
+   ═══════════════════════════════════════════════ */
 :root {
-    --bg-primary: #111113;
-    --bg-secondary: #18181b;
-    --bg-tertiary: #1f1f23;
-    --bg-card: rgba(28, 28, 32, 0.75);
-    --bg-card-hover: rgba(36, 36, 40, 0.85);
-    --border-subtle: rgba(255, 255, 255, 0.06);
+    --bg-base: #161618;
+    --bg-sidebar: #1C1D20;
+    --bg-card: #24262B;
+    --bg-input: #2B2D31;
+    --border: rgba(255, 255, 255, 0.06);
     --border-hover: rgba(255, 255, 255, 0.12);
-    --text-primary: #fafafa;
-    --text-secondary: #a1a1aa;
-    --text-muted: #71717a;
-    --accent: #10b981;
-    --accent-hover: #34d399;
-    --accent-dim: rgba(16, 185, 129, 0.10);
-    --accent-border: rgba(16, 185, 129, 0.20);
-    --danger: #ef4444;
-    --danger-dim: rgba(239, 68, 68, 0.10);
-    --purple-dim: rgba(168, 85, 247, 0.10);
+    --accent: #3ECF8E;
+    --accent-secondary: #6EE7B7;
+    --accent-dim: rgba(62, 207, 142, 0.10);
+    --accent-border: rgba(62, 207, 142, 0.22);
+    --text-primary: #F5F5F5;
+    --text-secondary: #A1A1AA;
+    --text-muted: #71717A;
+    --danger-dim: rgba(239, 68, 68, 0.08);
+    --purple-dim: rgba(168, 85, 247, 0.08);
     --purple-text: #c4b5fd;
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
+    --shadow-card: 0 10px 30px rgba(0, 0, 0, 0.35);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+    --radius: 20px;
+    --radius-sm: 12px;
+    --radius-xs: 8px;
+    --spacing-section: 28px;
+    --spacing-chat: 20px;
 }
 
+/* ═══════════════════════════════════════════════
+   GLOBAL
+   ═══════════════════════════════════════════════ */
 html, body, [class*="css"] {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    line-height: 1.6 !important;
 }
 
 .stApp {
-    background: var(--bg-primary) !important;
+    background: var(--bg-base) !important;
     color: var(--text-primary) !important;
 }
 
@@ -184,26 +193,36 @@ html, body, [class*="css"] {
 }
 
 .stMainBlockContainer {
-    max-width: 900px !important;
-    padding-top: 2rem !important;
+    max-width: 880px !important;
+    padding: 2.5rem 1.5rem !important;
 }
 
-/* ── SIDEBAR ── */
+/* ═══════════════════════════════════════════════
+   SIDEBAR
+   ═══════════════════════════════════════════════ */
 section[data-testid="stSidebar"] {
-    background: var(--bg-secondary) !important;
-    border-right: 1px solid var(--border-subtle) !important;
+    background: var(--bg-sidebar) !important;
+    border-right: 1px solid var(--border) !important;
 }
 
 section[data-testid="stSidebar"] * {
     color: var(--text-primary) !important;
 }
 
+section[data-testid="stSidebar"] h1 {
+    font-size: 1.15rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.01em !important;
+    margin-bottom: var(--spacing-section) !important;
+}
+
 section[data-testid="stSidebar"] h2 {
-    font-size: 0.85rem !important;
+    font-size: 0.72rem !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.06em !important;
+    letter-spacing: 0.08em !important;
     color: var(--text-muted) !important;
-    margin-top: 1.2rem !important;
+    margin-top: var(--spacing-section) !important;
+    margin-bottom: 12px !important;
     font-weight: 600 !important;
 }
 
@@ -213,90 +232,114 @@ section[data-testid="stSidebar"] code {
     padding: 2px 8px !important;
     border-radius: 6px !important;
     font-family: 'JetBrains Mono', monospace !important;
-    font-size: 0.8rem !important;
+    font-size: 0.78rem !important;
     border: 1px solid var(--accent-border) !important;
 }
 
 section[data-testid="stSidebar"] .stButton > button {
-    font-size: 0.78rem !important;
-    padding: 0.35rem 0.8rem !important;
+    font-size: 0.76rem !important;
+    padding: 0.4rem 0.8rem !important;
     text-align: left !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
 }
 
-/* ── TITLE ── */
+/* ═══════════════════════════════════════════════
+   TITLE — Slow shimmer, white-to-gray with emerald tint
+   ═══════════════════════════════════════════════ */
 h1 {
-    background: linear-gradient(135deg, #fafafa 0%, #a1a1aa 100%) !important;
+    background: linear-gradient(
+        135deg,
+        #F5F5F5 0%,
+        #d4d4d8 40%,
+        #6EE7B7 60%,
+        #d4d4d8 80%,
+        #F5F5F5 100%
+    ) !important;
+    background-size: 300% 300% !important;
     -webkit-background-clip: text !important;
     -webkit-text-fill-color: transparent !important;
     background-clip: text !important;
     font-weight: 700 !important;
-    letter-spacing: -0.02em !important;
+    letter-spacing: -0.025em !important;
+    animation: titleShimmer 14s ease-in-out infinite !important;
 }
 
-/* ── STATUS BADGES ── */
+@keyframes titleShimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50%      { background-position: 100% 50%; }
+}
+
+/* ═══════════════════════════════════════════════
+   STATUS BADGES
+   ═══════════════════════════════════════════════ */
 .status-badge {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 16px;
+    padding: 8px 18px;
     border-radius: 50px;
-    font-size: 0.82em;
+    font-size: 0.8em;
     font-weight: 500;
     font-family: 'Inter', sans-serif;
     border: 1px solid;
+    margin-bottom: 8px;
 }
 
 .status-ready {
     background: var(--accent-dim);
-    color: var(--accent-hover);
+    color: var(--accent-secondary);
     border-color: var(--accent-border);
 }
 
 .status-none {
     background: var(--danger-dim);
     color: #fca5a5;
-    border-color: rgba(239, 68, 68, 0.20);
+    border-color: rgba(239, 68, 68, 0.15);
 }
 
-/* ── MODE BADGES ── */
+/* ═══════════════════════════════════════════════
+   MODE BADGES
+   ═══════════════════════════════════════════════ */
 .mode-badge {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 3px 12px;
+    padding: 4px 14px;
     border-radius: 50px;
-    font-size: 0.72em;
+    font-size: 0.7em;
     font-weight: 500;
     font-family: 'Inter', sans-serif;
-    margin-bottom: 6px;
+    letter-spacing: 0.02em;
+    margin-bottom: 8px;
     border: 1px solid;
 }
 
 .mode-code {
     background: var(--accent-dim);
-    color: var(--accent-hover);
+    color: var(--accent-secondary);
     border-color: var(--accent-border);
 }
 
 .mode-general {
     background: var(--purple-dim);
     color: var(--purple-text);
-    border-color: rgba(168, 85, 247, 0.20);
+    border-color: rgba(168, 85, 247, 0.15);
 }
 
-/* ── CHAT MESSAGES ── */
+/* ═══════════════════════════════════════════════
+   CHAT MESSAGES
+   ═══════════════════════════════════════════════ */
 [data-testid="stChatMessage"] {
     background: var(--bg-card) !important;
-    backdrop-filter: blur(8px) !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: var(--radius-lg) !important;
-    padding: 1.1rem 1.4rem !important;
-    margin-bottom: 0.8rem !important;
-    transition: border-color 0.2s ease, background 0.2s ease !important;
-    animation: msgFadeIn 0.35s ease-out forwards;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    padding: 24px !important;
+    margin-bottom: var(--spacing-chat) !important;
+    box-shadow: var(--shadow-card) !important;
+    transition: border-color 0.25s ease, transform 0.25s ease !important;
+    animation: msgFadeIn 0.3s ease-out forwards;
     color: var(--text-primary) !important;
 }
 
@@ -306,7 +349,7 @@ h1 {
 
 [data-testid="stChatMessage"]:hover {
     border-color: var(--border-hover) !important;
-    background: var(--bg-card-hover) !important;
+    transform: translateY(-1px) !important;
 }
 
 [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
@@ -314,23 +357,27 @@ h1 {
 }
 
 [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) {
-    border-left: 2px solid var(--text-muted) !important;
+    border-left: 2px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 @keyframes msgFadeIn {
-    from { opacity: 0; transform: translateY(10px); }
+    from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── CODE BLOCKS ── */
+/* ═══════════════════════════════════════════════
+   CODE BLOCKS
+   ═══════════════════════════════════════════════ */
 [data-testid="stChatMessage"] pre {
-    background: var(--bg-primary) !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: var(--radius-sm) !important;
-    padding: 0.8rem 1rem !important;
+    background: var(--bg-base) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-xs) !important;
+    padding: 16px 20px !important;
     font-family: 'JetBrains Mono', monospace !important;
     font-size: 0.82rem !important;
+    line-height: 1.7 !important;
     overflow-x: auto !important;
+    margin: 12px 0 !important;
 }
 
 [data-testid="stChatMessage"] code {
@@ -339,66 +386,81 @@ h1 {
 }
 
 [data-testid="stChatMessage"] p code {
-    background: rgba(255, 255, 255, 0.06) !important;
-    padding: 2px 6px !important;
-    border-radius: 4px !important;
-    border: 1px solid var(--border-subtle) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    padding: 2px 7px !important;
+    border-radius: 5px !important;
+    border: 1px solid var(--border) !important;
 }
 
-/* ── CHAT INPUT ── */
+/* ═══════════════════════════════════════════════
+   CHAT INPUT — ChatGPT / Claude style
+   ═══════════════════════════════════════════════ */
 [data-testid="stChatInput"] {
-    border-radius: var(--radius-lg) !important;
+    border-radius: var(--radius) !important;
     overflow: hidden;
 }
 
 [data-testid="stChatInput"] textarea {
-    background: var(--bg-tertiary) !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: var(--radius-lg) !important;
+    background: var(--bg-input) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: var(--radius) !important;
     color: var(--text-primary) !important;
     font-family: 'Inter', sans-serif !important;
-    padding: 14px 18px !important;
+    padding: 16px 20px !important;
     font-size: 0.92rem !important;
-    transition: border-color 0.2s ease !important;
+    line-height: 1.6 !important;
+    transition: border-color 0.25s ease !important;
+}
+
+[data-testid="stChatInput"] textarea:hover {
+    border-color: rgba(255, 255, 255, 0.12) !important;
 }
 
 [data-testid="stChatInput"] textarea:focus {
     border-color: var(--accent) !important;
-    box-shadow: 0 0 0 1px var(--accent-border) !important;
+    box-shadow: none !important;
+    outline: none !important;
 }
 
 [data-testid="stChatInput"] textarea::placeholder {
     color: var(--text-muted) !important;
 }
 
-/* ── BUTTONS ── */
+/* ═══════════════════════════════════════════════
+   BUTTONS — Glassmorphism
+   ═══════════════════════════════════════════════ */
 .stButton > button {
-    background: var(--bg-tertiary) !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: var(--radius-md) !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-sm) !important;
     color: var(--text-primary) !important;
     font-weight: 500 !important;
     font-family: 'Inter', sans-serif !important;
-    padding: 0.5rem 1rem !important;
-    transition: all 0.2s ease !important;
+    padding: 0.5rem 1.1rem !important;
+    backdrop-filter: blur(8px) !important;
+    transition: all 0.25s ease !important;
 }
 
 .stButton > button:hover {
     background: rgba(255, 255, 255, 0.06) !important;
     border-color: var(--border-hover) !important;
     transform: translateY(-1px);
+    box-shadow: var(--shadow-sm) !important;
 }
 
 .stButton > button:active {
-    transform: translateY(0) scale(0.99);
+    transform: translateY(0) scale(0.98);
 }
 
-/* ── EXPANDER ── */
+/* ═══════════════════════════════════════════════
+   EXPANDER
+   ═══════════════════════════════════════════════ */
 [data-testid="stExpander"] {
-    background: rgba(17, 17, 19, 0.5) !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: var(--radius-md) !important;
-    margin-top: 0.6rem !important;
+    background: rgba(22, 22, 24, 0.6) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-sm) !important;
+    margin-top: 12px !important;
+    transition: border-color 0.25s ease !important;
 }
 
 [data-testid="stExpander"]:hover {
@@ -408,25 +470,29 @@ h1 {
 [data-testid="stExpander"] summary {
     color: var(--text-secondary) !important;
     font-weight: 500 !important;
-    font-size: 0.85rem !important;
+    font-size: 0.82rem !important;
 }
 
-/* ── STATUS CONTAINER ── */
+/* ═══════════════════════════════════════════════
+   STATUS CONTAINER (Thinking steps)
+   ═══════════════════════════════════════════════ */
 [data-testid="stStatusWidget"] {
-    background: var(--bg-tertiary) !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: var(--radius-md) !important;
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-sm) !important;
 }
 
-/* ── TEXT INPUT ── */
+/* ═══════════════════════════════════════════════
+   TEXT INPUT (sidebar)
+   ═══════════════════════════════════════════════ */
 [data-testid="stTextInput"] input {
-    background: var(--bg-primary) !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: var(--radius-sm) !important;
+    background: var(--bg-base) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-xs) !important;
     color: var(--text-primary) !important;
     font-family: 'JetBrains Mono', monospace !important;
     font-size: 0.8rem !important;
-    transition: border-color 0.2s ease !important;
+    transition: border-color 0.25s ease !important;
 }
 
 [data-testid="stTextInput"] input:focus {
@@ -434,26 +500,33 @@ h1 {
     box-shadow: none !important;
 }
 
-/* ── FILE UPLOADER ── */
+/* ═══════════════════════════════════════════════
+   FILE UPLOADER
+   ═══════════════════════════════════════════════ */
 [data-testid="stFileUploader"] {
-    border-radius: var(--radius-md) !important;
+    border-radius: var(--radius-sm) !important;
 }
 
-/* ── SCROLLBAR ── */
-::-webkit-scrollbar { width: 5px; }
+/* ═══════════════════════════════════════════════
+   SCROLLBAR
+   ═══════════════════════════════════════════════ */
+::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.12); }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.1); }
 
-/* ── MISC ── */
-hr { border-color: var(--border-subtle) !important; }
-.stCaption, [data-testid="stCaptionContainer"] { color: var(--text-muted) !important; }
-[data-testid="stAlert"] { border-radius: var(--radius-md) !important; }
+/* ═══════════════════════════════════════════════
+   MISC
+   ═══════════════════════════════════════════════ */
+hr { border-color: var(--border) !important; }
+.stCaption, [data-testid="stCaptionContainer"] { color: var(--text-muted) !important; font-size: 0.78rem !important; }
+[data-testid="stAlert"] { border-radius: var(--radius-sm) !important; }
 [data-testid="stSpinner"] { color: var(--accent) !important; }
 #cursor-glow, #particle-canvas, #flash-overlay { display: none; }
 
 </style>
 """, unsafe_allow_html=True)
+
 
 # ──────────────────────────────────────────────
 # JavaScript: subtle cursor glow + auto-scroll
@@ -481,8 +554,8 @@ components.html("""
         const x = e.clientX, y = e.clientY;
         glowEl.style.background =
             `radial-gradient(500px circle at ${x}px ${y}px,
-             rgba(16, 185, 129, 0.03),
-             rgba(255, 255, 255, 0.01),
+             rgba(62, 207, 142, 0.03),
+             rgba(255, 255, 255, 0.008),
              transparent 60%)`;
     });
 

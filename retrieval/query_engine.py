@@ -162,7 +162,7 @@ Answer:"""
 # Main ask function (hybrid: RAG + general)
 # ──────────────────────────────────────────────
 
-def ask(query_engine, question):
+def ask(query_engine, question, progress_fn=None):
     """Ask a question with automatic fallback to general knowledge.
 
     Flow:
@@ -175,19 +175,29 @@ def ask(query_engine, question):
     Args:
         query_engine: A LlamaIndex query engine (for code questions).
         question: The natural-language question to ask.
+        progress_fn: Optional callback function(step_message: str) to
+                     report progress to the UI in real time.
 
     Returns:
-        A tuple of (answer_text, sources_list).
-        sources_list contains dicts with file, name, type, line, score, mode.
+        A tuple of (answer_text, sources_list, mode).
+        sources_list contains dicts with file, name, type, line, score.
         If mode == "general", sources_list will be empty.
     """
+    def _progress(msg):
+        if progress_fn:
+            progress_fn(msg)
+
     logger.info("Question: %s", question)
 
-    # Step 1: Try RAG pipeline
+    # Step 1: Retrieve relevant code chunks
+    _progress("Searching codebase for relevant code...")
     response = query_engine.query(question)
+
     best_score = _get_best_score(response.source_nodes)
+    num_chunks = len(response.source_nodes)
     rag_answer = str(response)
 
+    _progress(f"Retrieved {num_chunks} chunks (best score: {best_score:.2f})")
     logger.info("RAG best_score=%.4f, answer_preview=%s", best_score, rag_answer[:100])
 
     # Step 2: Decide if we should fall back to general mode
@@ -196,11 +206,13 @@ def ask(query_engine, question):
 
     if low_relevance or says_not_found:
         # Fall back to general-knowledge LLM
+        _progress("Low relevance -- switching to general knowledge mode...")
         logger.info(
             "Falling back to general mode (low_relevance=%s, says_not_found=%s)",
             low_relevance, says_not_found,
         )
         try:
+            _progress("Generating answer from general knowledge...")
             general_answer = _ask_general(question)
             mode = "general"
             answer_text = general_answer
@@ -213,9 +225,12 @@ def ask(query_engine, question):
             sources = _extract_sources(response)
     else:
         # RAG answer is relevant -- use it
+        _progress("Generating answer from codebase context...")
         mode = "code"
         answer_text = rag_answer
         sources = _extract_sources(response)
+
+    _progress("Done!")
 
     # Log the query locally for debugging/audit
     _log_query(question, answer_text, sources, mode, best_score)

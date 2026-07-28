@@ -7,6 +7,9 @@ data/query_log.jsonl
 # Chat history
 data/chat_history/
 
+# Uploads
+data/uploads/
+
 # Python
 __pycache__/
 *.py[cod]

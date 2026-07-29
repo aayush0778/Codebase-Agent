@@ -25,7 +25,7 @@ Python Codebase (.py files)
 [4] Similarity Search → top-k chunks retrieved
         │
         ▼
-[5] Local LLM (Ollama: devstral:24b)
+[5] Local LLM (Ollama: devstral-small-2:24b)
         │
         ▼
 [6] Grounded Answer + Source Citations
@@ -43,7 +43,7 @@ Python Codebase (.py files)
 curl -fsSL https://ollama.com/install.sh | sh
 
 # Pull required models
-ollama pull devstral:24b
+ollama pull devstral-small-2:24b
 ollama pull nomic-embed-text
 
 # Verify
@@ -107,7 +107,7 @@ All settings are in `config.py`:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `LLM_MODEL` | `devstral:24b` | Ollama LLM model for generation |
+| `LLM_MODEL` | `devstral-small-2:24b` | Ollama LLM model for generation |
 | `EMBEDDING_MODEL` | `nomic-embed-text` | Ollama embedding model |
 | `TOP_K` | `8` | Number of chunks retrieved per query |
 | `LLM_REQUEST_TIMEOUT` | `300.0` | LLM request timeout in seconds |
@@ -117,7 +117,7 @@ All settings are in `config.py`:
 | RAM | GPU VRAM | Recommended Model |
 |-----|----------|-------------------|
 | 16 GB | 8 GB | `deepseek-coder:6.7b` |
-| 32 GB | 16 GB | `devstral:24b` |
+| 32 GB | 16 GB | `devstral-small-2:24b` |
 | 64 GB+ | 24 GB+ | `codellama:34b` |
 | CPU only | — | `deepseek-coder:6.7b` (slower) |
 

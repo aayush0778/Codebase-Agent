@@ -12,6 +12,8 @@ import logging
 import json
 import datetime
 from pathlib import Path
+import urllib.request
+import urllib.error
 
 import chromadb
 from llama_index.core import VectorStoreIndex, StorageContext
@@ -236,7 +238,7 @@ def ask(query_engine, question, progress_fn=None):
     _log_query(question, answer_text, sources, mode, best_score)
 
     logger.info("Answer generated in '%s' mode with %d source(s).", mode, len(sources))
-    return answer_text, sources, mode
+    return answer_text, sources, mode, best_score
 
 
 def _extract_sources(response):
@@ -276,3 +278,28 @@ def _log_query(question, answer, sources, mode, best_score):
             f.write(json.dumps(record) + "\n")
     except Exception as e:
         logger.warning("Failed to write query log: %s", e)
+
+
+def get_index_stats():
+    """Read and return stats from data/index_stats.json, or None if it doesn't exist."""
+    stats_file = Path("data/index_stats.json")
+    if stats_file.exists():
+        try:
+            with open(stats_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.warning("Failed to read index stats: %s", e)
+    return None
+
+
+def check_ollama_status():
+    """Check Ollama connection and list loaded models."""
+    try:
+        req = urllib.request.Request("http://localhost:11434/api/tags", method="GET")
+        with urllib.request.urlopen(req, timeout=2) as response:
+            data = json.loads(response.read().decode("utf-8"))
+            models = [m.get("name") for m in data.get("models", [])]
+            return {"running": True, "models": models}
+    except Exception as e:
+        logger.warning("Ollama status check failed: %s", e)
+        return {"running": False, "models": []}

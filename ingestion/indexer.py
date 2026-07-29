@@ -27,6 +27,14 @@ from config import (
 logger = logging.getLogger(__name__)
 
 
+import datetime
+import json
+import os
+
+class IndexTuple(tuple):
+    def __getattr__(self, name):
+        return getattr(self[0], name)
+
 def build_index(root_dir, persist_dir=None):
     """Embed all code chunks and persist them to a local Chroma vector store.
 
@@ -87,4 +95,20 @@ def build_index(root_dir, persist_dir=None):
     logger.info("Index built and persisted to %s (%.1f seconds)", persist_dir, elapsed)
     print(f"\n[OK] Indexed {len(chunks)} chunks in {elapsed:.1f}s -> {persist_dir}")
 
-    return index
+    repo_name = os.path.basename(os.path.abspath(root_dir))
+    unique_files = len(set(c["file"] for c in chunks))
+    
+    stats_dict = {
+        "files_indexed": unique_files,
+        "chunks_generated": len(chunks),
+        "elapsed_seconds": elapsed,
+        "timestamp": datetime.datetime.now().isoformat(),
+        "repo_name": repo_name,
+    }
+    
+    stats_file = Path("data/index_stats.json")
+    stats_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(stats_file, "w", encoding="utf-8") as f:
+        json.dump(stats_dict, f, indent=2)
+
+    return IndexTuple((index, stats_dict))

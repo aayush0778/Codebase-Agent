@@ -1,136 +1,112 @@
-# Local AST-Aware Codebase Assistant
+# 📘 CodebookLM v1.0
+Offline AI Codebase Assistant
 
-> **Codebase Assistant** — Intelligent local RAG system for querying a Python codebase.  
-> **Fully offline / air-gapped.** No cloud APIs, no data leaving the machine at any point.
+> Understand Any Codebase. Instantly.
+
+CodebookLM is an offline AI-powered software repository assistant that enables developers to explore, understand and query software repositories using Retrieval-Augmented Generation (RAG), semantic search and local Large Language Models while ensuring complete source-code privacy.
+
+---
+
+## Overview
+
+CodebookLM is designed to give you a "ChatGPT-like" experience over your own codebase without sending a single line of code to the cloud. It builds a local semantic index of your repository and uses a local Large Language Model (like Mistral or LLaMA) to answer complex architectural and implementation questions. 
+
+It is built for privacy, speed, and accuracy—providing source code attribution for every answer so you can trust its output and navigate directly to the relevant files.
+
+## Features
+
+- **100% Offline & Private:** No internet connection required. Your code never leaves your machine.
+- **Source Attribution:** Every codebase-grounded response includes collapsible citations with file names, line numbers, and relevance scores.
+- **Repository Dashboard:** Instant overview of your indexed repository including chunk count, build time, and status.
+- **System Diagnostics:** Built-in monitoring for Ollama status, active LLM, Embedding model, and GPU VRAM usage.
+- **Export Conversations:** Export your entire chat session as Markdown or Text for documentation or sharing.
+- **Premium Desktop Experience:** Clean, minimal, professional interface inspired by tools like Linear, Cursor, and Notion.
+- **Hybrid Retrieval:** Automatically falls back to general knowledge if the answer isn't in your codebase.
 
 ## Architecture
 
-```
-Python Codebase (.py files)
-        │
-        ▼
-[1] AST Parser (ast_chunker.py)
-    Extracts functions, classes, async functions
-        │
-        ▼
-[2] Embedding Model (Ollama: nomic-embed-text)
-        │
-        ▼
-[3] Vector Store (ChromaDB → local disk)
-        │
-        ▼
-   User Question (typed in Streamlit UI)
-        │
-        ▼
-[4] Similarity Search → top-k chunks retrieved
-        │
-        ▼
-[5] Local LLM (Ollama: devstral-small-2:24b)
-        │
-        ▼
-[6] Grounded Answer + Source Citations
+```mermaid
+graph TD
+    A[Upload Repository / .zip] --> B(AST Parsing & Chunking)
+    B --> C[Ollama Local Embeddings]
+    C --> D[(ChromaDB Vector Store)]
+    
+    E[User Question] --> F(Query Engine)
+    F --> |Retrieve Top-K Chunks| D
+    
+    D --> G[Local LLM Generation]
+    G --> H[CodebookLM v1.0 UI]
+    H --> |Sources & Confidence| I(Developer)
 ```
 
-## Quick Start
+## Technology Stack
+
+- **Frontend:** Streamlit (Custom UI/UX styling)
+- **RAG & Indexing:** LlamaIndex
+- **Vector Database:** ChromaDB
+- **Local LLM Engine:** Ollama
+- **Default LLM:** Devstral Small 2 (`devstral-small-2:24b`)
+- **Default Embeddings:** `nomic-embed-text`
+
+## Installation
 
 ### 1. Prerequisites
-
-- **Python 3.10+**
-- **Ollama** installed and running
-
-```bash
-# Install Ollama (Linux/macOS)
-curl -fsSL https://ollama.com/install.sh | sh
-
-# Pull required models
-ollama pull devstral-small-2:24b
-ollama pull nomic-embed-text
-
-# Verify
-ollama list
-```
+- Python 3.10+
+- [Ollama](https://ollama.com) installed and running.
 
 ### 2. Install Dependencies
-
 ```bash
-cd code-rag-agent
-python -m venv venv
-# Windows:
-venv\Scripts\activate
-# Linux/macOS:
-# source venv/bin/activate
-
+git clone https://github.com/aayush0778/Codebase-Agent.git
+cd Codebase-Agent
 pip install -r requirements.txt
 ```
 
-### 3. Index a Codebase
-
+### 3. Pull Required Models
+Ensure Ollama is running, then download the necessary models:
 ```bash
-# Via CLI script
-python scripts/build_index.py --path /path/to/your/python/codebase
-
-# Or use the Streamlit sidebar (see step 4)
+ollama pull devstral-small-2:24b
+ollama pull nomic-embed-text
 ```
 
-### 4. Launch the Chat UI
+## Usage
 
+### Launching the Application
+You can use the provided desktop launchers for a quick start:
+- **Windows:** Double-click `CodebookLM.bat`
+- **PowerShell:** Run `.\Launch-CodebookLM.ps1`
+
+Or run manually via terminal:
 ```bash
-streamlit run app.py
+python -m streamlit run app.py
 ```
 
-Open `http://localhost:8501` in your browser.
+### Workflow
+1. **Upload Repository:** Drag and drop your `.py` files or a `.zip` archive containing your repository using the sidebar.
+2. **Build Semantic Index:** Click "Build Index" to parse and embed your codebase into ChromaDB.
+3. **Ask Questions:** Use the chat interface to ask architectural, stylistic, or implementation questions.
+4. **Inspect Sources:** Expand the "📄 Sources" panel after any codebase response to see exactly where the LLM got its information.
+5. **Export:** Click the "Export" buttons in the sidebar to save your session.
 
-## Project Structure
+## Screenshots
 
-```
-code-rag-agent/
-├── config.py                 # Centralized configuration
-├── app.py                    # Streamlit chat UI (entry point)
-├── requirements.txt          # Python dependencies
-├── ingestion/
-│   ├── __init__.py
-│   ├── ast_chunker.py        # AST parsing → chunk extraction
-│   └── indexer.py            # Embed chunks, build/persist Chroma index
-├── retrieval/
-│   ├── __init__.py
-│   └── query_engine.py       # Retrieval + prompt + LLM call
-├── scripts/
-│   └── build_index.py        # CLI script to (re)index a codebase
-├── data/
-│   └── chroma_index/         # Persisted vector store (gitignored)
-└── sample_codebase/          # Sample code for testing
-```
+*(Add screenshots of the UI here)*
 
-## Configuration
+## Troubleshooting
 
-All settings are in `config.py`:
+- **No index loaded?** Ensure you upload files and click "Build Index" in the sidebar before asking code-related questions.
+- **Model not found error?** Check that Ollama is running and you have pulled the required models (`ollama list`). You can change the default model in `config.py`.
+- **GPU Not Detected?** Ensure `nvidia-smi` is accessible in your system PATH. The application will fall back to CPU if a GPU is unavailable.
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `LLM_MODEL` | `devstral-small-2:24b` | Ollama LLM model for generation |
-| `EMBEDDING_MODEL` | `nomic-embed-text` | Ollama embedding model |
-| `TOP_K` | `8` | Number of chunks retrieved per query |
-| `LLM_REQUEST_TIMEOUT` | `300.0` | LLM request timeout in seconds |
+## Future Enhancements
+- Multi-language AST parsing (JS/TS, Go, Rust, Java).
+- Advanced chunking strategies (e.g., semantic boundaries).
+- Direct GitHub repository ingestion via URL.
+- Persistent multiple repository indexing.
 
-### Hardware Recommendations
+## License
 
-| RAM | GPU VRAM | Recommended Model |
-|-----|----------|-------------------|
-| 16 GB | 8 GB | `deepseek-coder:6.7b` |
-| 32 GB | 16 GB | `devstral-small-2:24b` |
-| 64 GB+ | 24 GB+ | `codellama:34b` |
-| CPU only | — | `deepseek-coder:6.7b` (slower) |
+This project is licensed under the MIT License. See the LICENSE file for details.
 
-## Security Notes
+## Credits
 
-- **All data stays local.** No network calls at runtime.
-- The `data/chroma_index/` folder contains embedded representations of your code — **treat it with the same classification level as the source code.**
-- Query logs are stored in `data/query_log.jsonl` — also treat as classified if applicable.
-
-## Key Files to Understand
-
-1. **`ast_chunker.py`** — Why function/class-level chunking beats fixed-size text splitting for code
-2. **`indexer.py`** — How chunks become vectors with metadata attached at indexing time
-3. **`query_engine.py`** — The retrieval-then-generate flow; try changing `top_k` in `config.py`
-4. **The prompt template** in `config.py` — Small wording changes have outsized effects on hallucination
-5. **`app.py`** — The Streamlit UI (least conceptually important, most visible in demos)
+Designed and built for developers who care about code privacy and AI accessibility.

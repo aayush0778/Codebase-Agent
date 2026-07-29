@@ -1,7 +1,6 @@
 """
-Codebase Assistant — Streamlit UI
-A local RAG-powered assistant for querying Python codebases.
-Supports both codebase-specific and general knowledge questions.
+CodebookLM v1.0 — Streamlit UI
+Offline AI Codebase Assistant
 """
 
 import sys
@@ -53,7 +52,6 @@ def _generate_chat_id():
     """Generate a unique chat ID based on timestamp."""
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
-
 def _get_chat_title(messages):
     """Extract a title from the first user message, or return a default."""
     for msg in messages:
@@ -63,7 +61,6 @@ def _get_chat_title(messages):
                 title += "..."
             return title
     return "Empty chat"
-
 
 def _save_chat(chat_id, messages):
     """Save a chat session to disk as JSON."""
@@ -80,7 +77,6 @@ def _save_chat(chat_id, messages):
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-
 def _load_chat(chat_id):
     """Load a chat session from disk."""
     filepath = os.path.join(CHAT_HISTORY_DIR, f"{chat_id}.json")
@@ -88,7 +84,6 @@ def _load_chat(chat_id):
         return None
     with open(filepath, "r", encoding="utf-8") as f:
         return json.load(f)
-
 
 def _list_chats():
     """List all saved chats, sorted by most recent first."""
@@ -110,17 +105,44 @@ def _list_chats():
     chats.sort(key=lambda c: c["updated"], reverse=True)
     return chats
 
-
 def _delete_chat(chat_id):
     """Delete a saved chat from disk."""
     filepath = os.path.join(CHAT_HISTORY_DIR, f"{chat_id}.json")
     if os.path.exists(filepath):
         os.remove(filepath)
 
+def _format_export_content(messages, format="md"):
+    """Format chat messages for export."""
+    lines = []
+    if format == "md":
+        lines.append("# CodebookLM v1.0 Conversation Export\n")
+        lines.append(f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n")
+        for msg in messages:
+            role = "User" if msg["role"] == "user" else "CodebookLM"
+            lines.append(f"### {role}\n")
+            lines.append(f"{msg['content']}\n")
+            if msg.get("sources"):
+                lines.append("\n**Sources:**\n")
+                for s in msg["sources"]:
+                    lines.append(f"- `{s['file']}` -> `{s['name']}` (Line {s['line']})\n")
+            lines.append("\n---\n")
+    else:
+        lines.append("CodebookLM v1.0 Conversation Export\n")
+        lines.append(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        lines.append("=========================================================\n\n")
+        for msg in messages:
+            role = "User" if msg["role"] == "user" else "CodebookLM"
+            lines.append(f"[{role}]\n")
+            lines.append(f"{msg['content']}\n")
+            if msg.get("sources"):
+                lines.append("\nSources:\n")
+                for s in msg["sources"]:
+                    lines.append(f"  - {s['file']} -> {s['name']} (Line {s['line']})\n")
+            lines.append("\n---------------------------------------------------------\n\n")
+    return "".join(lines)
 
 def _handle_uploads(uploaded_files):
     """Save uploaded .py and .zip files to the upload directory.
-
     Returns the path to the directory and the count of .py files.
     """
     if os.path.exists(UPLOAD_DIR):
@@ -204,19 +226,28 @@ def _render_sources(sources, mode):
             unsafe_allow_html=True,
         )
 
+def _get_time_duration(start_iso):
+    """Calculate duration string from iso start time."""
+    try:
+        start_dt = datetime.fromisoformat(start_iso)
+        duration = datetime.now() - start_dt
+        minutes = int(duration.total_seconds() // 60)
+        return f"{minutes} min" if minutes > 0 else "< 1 min"
+    except Exception:
+        return "Unknown"
 
 # ──────────────────────────────────────────────
 # Page config
 # ──────────────────────────────────────────────
 st.set_page_config(
-    page_title="Codebase Assistant",
-    page_icon="🔍",
+    page_title="📘 CodebookLM v1.0",
+    page_icon="📘",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # ──────────────────────────────────────────────
-# CSS: Premium developer-tool aesthetic
+# CSS: Premium desktop application aesthetic (Linear/Notion inspired)
 # ──────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -242,10 +273,10 @@ st.markdown("""
     --purple-text: #c4b5fd;
     --yellow-dim: rgba(234, 179, 8, 0.10);
     --yellow-text: #fde047;
-    --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.3);
-    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.2);
-    --radius: 16px;
-    --radius-sm: 10px;
+    --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.25);
+    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.15);
+    --radius: 12px;
+    --radius-sm: 8px;
     --radius-xs: 6px;
 }
 
@@ -273,14 +304,14 @@ section[data-testid="stSidebar"] {
 }
 section[data-testid="stSidebar"] * { color: var(--text-primary) !important; }
 section[data-testid="stSidebar"] h1 {
-    font-size: 1.1rem !important; font-weight: 700 !important;
-    letter-spacing: -0.01em !important; margin-bottom: 20px !important;
+    font-size: 1.15rem !important; font-weight: 600 !important;
+    letter-spacing: -0.01em !important; margin-bottom: 24px !important;
     background: none !important; -webkit-text-fill-color: var(--text-primary) !important;
 }
-section[data-testid="stSidebar"] h2 {
-    font-size: 0.68rem !important; text-transform: uppercase !important;
-    letter-spacing: 0.1em !important; color: var(--text-muted) !important;
-    margin-top: 20px !important; margin-bottom: 8px !important; font-weight: 600 !important;
+section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {
+    font-size: 0.72rem !important; text-transform: uppercase !important;
+    letter-spacing: 0.08em !important; color: var(--text-muted) !important;
+    margin-top: 24px !important; margin-bottom: 12px !important; font-weight: 600 !important;
 }
 section[data-testid="stSidebar"] code {
     background: var(--accent-dim) !important; color: var(--accent) !important;
@@ -289,29 +320,35 @@ section[data-testid="stSidebar"] code {
     border: 1px solid var(--accent-border) !important;
 }
 section[data-testid="stSidebar"] .stButton > button {
-    font-size: 0.74rem !important; padding: 0.35rem 0.7rem !important;
+    font-size: 0.8rem !important; padding: 0.4rem 0.8rem !important;
     text-align: left !important; white-space: nowrap !important;
     overflow: hidden !important; text-overflow: ellipsis !important;
+    border-radius: var(--radius-sm) !important;
 }
 
 /* ── TITLE ── */
 h1 {
-    background: linear-gradient(135deg, #F5F5F5 0%, #d4d4d8 45%, #4ADE80 55%, #d4d4d8 85%, #F5F5F5 100%) !important;
-    background-size: 300% 300% !important;
-    -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important;
-    background-clip: text !important; font-weight: 700 !important;
-    letter-spacing: -0.025em !important; animation: titleShimmer 14s ease-in-out infinite !important;
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.02em !important; 
 }
-@keyframes titleShimmer {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
+h1.hero-title {
+    font-size: 2.4rem !important; margin-bottom: 4px !important;
+}
+p.hero-subtitle {
+    font-size: 1.1rem !important; color: var(--text-secondary) !important;
+    margin-bottom: 16px !important; font-weight: 400 !important;
+}
+p.hero-desc {
+    font-size: 0.95rem !important; color: var(--text-muted) !important;
 }
 
 /* ── STATUS BADGES ── */
 .status-badge {
     display: inline-flex; align-items: center; gap: 8px;
-    padding: 7px 16px; border-radius: 50px; font-size: 0.78em;
+    padding: 6px 14px; border-radius: 6px; font-size: 0.8em;
     font-weight: 500; font-family: 'Inter', sans-serif; border: 1px solid;
+    margin-bottom: 20px;
 }
 .status-ready { background: var(--accent-dim); color: var(--accent-secondary); border-color: var(--accent-border); }
 .status-none { background: var(--danger-dim); color: #fca5a5; border-color: rgba(239,68,68,0.15); }
@@ -319,9 +356,9 @@ h1 {
 /* ── MODE BADGES ── */
 .mode-badge {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 4px 13px; border-radius: 50px; font-size: 0.7em;
+    padding: 4px 10px; border-radius: 6px; font-size: 0.72em;
     font-weight: 500; font-family: 'Inter', sans-serif;
-    letter-spacing: 0.02em; margin-bottom: 8px; border: 1px solid;
+    letter-spacing: 0.01em; margin-bottom: 8px; border: 1px solid;
 }
 .mode-code { background: var(--accent-dim); color: var(--accent-secondary); border-color: var(--accent-border); }
 .mode-general { background: var(--purple-dim); color: var(--purple-text); border-color: rgba(168,85,247,0.15); }
@@ -329,54 +366,49 @@ h1 {
 
 /* ── GENERAL NOTE ── */
 .general-note {
-    background: rgba(168, 85, 247, 0.06); border: 1px solid rgba(168,85,247,0.12);
-    border-radius: var(--radius-sm); padding: 10px 16px; margin-top: 8px;
-    font-size: 0.82em; color: var(--text-secondary);
+    background: rgba(168, 85, 247, 0.04); border: 1px solid rgba(168,85,247,0.1);
+    border-radius: var(--radius-sm); padding: 12px 16px; margin-top: 12px;
+    font-size: 0.85em; color: var(--text-secondary);
 }
 
 /* ── INFO CARD (sidebar) ── */
 .info-card {
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: var(--radius-sm); padding: 14px 16px; margin: 8px 0;
-    font-size: 0.78em; line-height: 1.8;
+    background: var(--bg-sidebar); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 16px; margin: 8px 0;
+    font-size: 0.82em; line-height: 1.8;
 }
-.info-card .label { color: var(--text-muted); }
+.info-card .label { color: var(--text-muted); display: inline-block; width: 110px; }
 .info-card .value { color: var(--text-primary); font-weight: 500; }
-.info-card .accent { color: var(--accent); font-weight: 600; }
-.info-card .dot-ok { color: #22C55E; }
-.info-card .dot-err { color: #ef4444; }
+.info-card .accent { color: var(--text-primary); font-weight: 600; font-size: 0.9em; }
+.info-card .dot-ok { color: #22C55E; margin-right: 4px; }
+.info-card .dot-err { color: #ef4444; margin-right: 4px; }
 
 /* ── CHAT MESSAGES ── */
 [data-testid="stChatMessage"] {
-    background: var(--bg-card) !important; border: 1px solid var(--border) !important;
-    border-radius: var(--radius) !important; padding: 22px !important;
-    margin-bottom: 16px !important; box-shadow: var(--shadow-card) !important;
-    transition: border-color 0.25s ease !important;
-    animation: msgFadeIn 0.3s ease-out forwards; color: var(--text-primary) !important;
+    background: var(--bg-base) !important; border: 1px solid transparent !important;
+    border-radius: 0 !important; padding: 16px 8px !important;
+    margin-bottom: 8px !important; box-shadow: none !important;
+    color: var(--text-primary) !important; border-bottom: 1px solid var(--border) !important;
 }
 [data-testid="stChatMessage"] * { color: var(--text-primary) !important; }
-[data-testid="stChatMessage"]:hover { border-color: var(--border-hover) !important; }
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) { border-left: 2px solid var(--accent) !important; }
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) { border-left: 2px solid rgba(255,255,255,0.08) !important; }
-@keyframes msgFadeIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) { 
+    background: rgba(255,255,255,0.02) !important; 
 }
 
 /* ── CODE BLOCKS ── */
 [data-testid="stChatMessage"] pre {
-    background: var(--bg-base) !important; border: 1px solid var(--border) !important;
-    border-radius: var(--radius-xs) !important; padding: 14px 18px !important;
+    background: var(--bg-card) !important; border: 1px solid var(--border) !important;
+    border-radius: var(--radius-sm) !important; padding: 14px 18px !important;
     font-family: 'JetBrains Mono', monospace !important; font-size: 0.82rem !important;
-    line-height: 1.7 !important; overflow-x: auto !important; margin: 10px 0 !important;
+    line-height: 1.6 !important; overflow-x: auto !important; margin: 12px 0 !important;
     position: relative !important;
 }
 [data-testid="stChatMessage"] code {
     font-family: 'JetBrains Mono', monospace !important; font-size: 0.82rem !important;
 }
 [data-testid="stChatMessage"] p code {
-    background: rgba(255,255,255,0.05) !important; padding: 2px 6px !important;
-    border-radius: 4px !important; border: 1px solid var(--border) !important;
+    background: rgba(255,255,255,0.06) !important; padding: 2px 6px !important;
+    border-radius: 4px !important; border: 1px solid transparent !important;
 }
 
 /* ── CHAT INPUT ── */
@@ -385,35 +417,32 @@ h1 {
     background: var(--bg-input) !important; border: 1px solid rgba(255,255,255,0.08) !important;
     border-radius: var(--radius) !important; color: var(--text-primary) !important;
     font-family: 'Inter', sans-serif !important; padding: 14px 18px !important;
-    font-size: 0.9rem !important; line-height: 1.6 !important;
-    transition: border-color 0.25s ease !important;
+    font-size: 0.95rem !important; line-height: 1.5 !important;
+    transition: border-color 0.2s ease !important;
 }
 [data-testid="stChatInput"] textarea:hover { border-color: rgba(255,255,255,0.12) !important; }
-[data-testid="stChatInput"] textarea:focus { border-color: var(--accent) !important; box-shadow: none !important; outline: none !important; }
+[data-testid="stChatInput"] textarea:focus { border-color: var(--text-secondary) !important; box-shadow: none !important; outline: none !important; }
 [data-testid="stChatInput"] textarea::placeholder { color: var(--text-muted) !important; }
 
 /* ── BUTTONS ── */
 .stButton > button {
-    background: rgba(255,255,255,0.03) !important; border: 1px solid var(--border) !important;
+    background: rgba(255,255,255,0.04) !important; border: 1px solid var(--border) !important;
     border-radius: var(--radius-sm) !important; color: var(--text-primary) !important;
     font-weight: 500 !important; font-family: 'Inter', sans-serif !important;
-    padding: 0.45rem 1rem !important; backdrop-filter: blur(6px) !important;
-    transition: all 0.25s ease !important;
+    padding: 0.45rem 1rem !important;
+    transition: all 0.2s ease !important;
 }
 .stButton > button:hover {
-    background: rgba(255,255,255,0.06) !important; border-color: var(--border-hover) !important;
-    transform: translateY(-1px); box-shadow: var(--shadow-sm) !important;
+    background: rgba(255,255,255,0.08) !important; border-color: var(--border-hover) !important;
 }
-.stButton > button:active { transform: translateY(0) scale(0.98); }
+.stButton > button:active { transform: scale(0.98); }
 
 /* ── EXPANDER ── */
 [data-testid="stExpander"] {
-    background: rgba(15,17,21,0.5) !important; border: 1px solid var(--border) !important;
-    border-radius: var(--radius-sm) !important; margin-top: 10px !important;
-    transition: border-color 0.25s ease !important;
+    background: transparent !important; border: 1px solid var(--border) !important;
+    border-radius: var(--radius-sm) !important; margin-top: 12px !important;
 }
-[data-testid="stExpander"]:hover { border-color: var(--border-hover) !important; }
-[data-testid="stExpander"] summary { color: var(--text-secondary) !important; font-weight: 500 !important; font-size: 0.82rem !important; }
+[data-testid="stExpander"] summary { color: var(--text-secondary) !important; font-weight: 500 !important; font-size: 0.85rem !important; }
 
 /* ── STATUS CONTAINER ── */
 [data-testid="stStatusWidget"] {
@@ -421,87 +450,61 @@ h1 {
     border-radius: var(--radius-sm) !important;
 }
 
-/* ── TEXT INPUT ── */
-[data-testid="stTextInput"] input {
-    background: var(--bg-base) !important; border: 1px solid var(--border) !important;
-    border-radius: var(--radius-xs) !important; color: var(--text-primary) !important;
-    font-family: 'JetBrains Mono', monospace !important; font-size: 0.78rem !important;
-    transition: border-color 0.25s ease !important;
-}
-[data-testid="stTextInput"] input:focus { border-color: var(--accent-border) !important; box-shadow: none !important; }
-
 /* ── FILE UPLOADER ── */
-[data-testid="stFileUploader"] { border-radius: var(--radius-sm) !important; }
+[data-testid="stFileUploader"] { border-radius: var(--radius-sm) !important; border: 1px dashed var(--border) !important; background: transparent !important; }
 
 /* ── EXAMPLE QUESTIONS ── */
 .example-btn button {
     background: var(--bg-card) !important; border: 1px solid var(--border) !important;
-    border-radius: var(--radius-sm) !important; font-size: 0.8rem !important;
-    padding: 8px 14px !important; text-align: left !important;
-    transition: all 0.2s ease !important; width: 100% !important;
+    border-radius: var(--radius-sm) !important; font-size: 0.85rem !important;
+    padding: 10px 14px !important; text-align: left !important; color: var(--text-secondary) !important;
+    transition: all 0.15s ease !important; width: 100% !important;
 }
 .example-btn button:hover {
-    border-color: var(--accent-border) !important;
+    border-color: rgba(255,255,255,0.2) !important; color: var(--text-primary) !important;
     background: var(--bg-hover) !important;
 }
 
 /* ── ONBOARDING ── */
 .onboarding {
-    text-align: center; padding: 60px 20px; color: var(--text-secondary);
+    text-align: center; padding: 80px 20px; color: var(--text-secondary);
 }
-.onboarding h2 { color: var(--text-primary); font-size: 1.4rem; font-weight: 600; margin-bottom: 8px; }
+.onboarding h2 { color: var(--text-primary); font-size: 1.8rem; font-weight: 600; margin-bottom: 30px; letter-spacing: -0.01em; }
+.onboarding .step-container { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .onboarding .step {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: var(--radius-sm); padding: 10px 20px; margin: 6px;
-    font-size: 0.85em; transition: border-color 0.2s ease;
+    display: flex; align-items: center; justify-content: flex-start;
+    background: transparent; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px 20px; width: 280px;
+    font-size: 0.9em; font-weight: 500; color: var(--text-primary);
 }
-.onboarding .arrow { color: var(--text-muted); font-size: 1.2em; margin: 4px 0; }
+.onboarding .step span { color: var(--text-muted); font-family: 'JetBrains Mono', monospace; margin-right: 12px; font-size: 0.85em; }
 
 /* ── FOOTER ── */
 .footer {
-    text-align: center; padding: 20px 0; margin-top: 40px;
+    text-align: center; padding: 24px 0; margin-top: 60px;
     border-top: 1px solid var(--border); color: var(--text-muted);
-    font-size: 0.72em; letter-spacing: 0.04em;
+    font-size: 0.8em; letter-spacing: 0.02em; font-weight: 400;
 }
 
 /* ── SCROLLBAR ── */
-::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.05); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.1); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
 
-/* ── MISC ── */
-hr { border-color: var(--border) !important; }
-.stCaption, [data-testid="stCaptionContainer"] { color: var(--text-muted) !important; font-size: 0.75rem !important; }
-[data-testid="stAlert"] { border-radius: var(--radius-sm) !important; }
-[data-testid="stSpinner"] { color: var(--accent) !important; }
-#cursor-glow, #particle-canvas, #flash-overlay { display: none; }
+hr { border-color: var(--border) !important; margin: 1.5rem 0 !important; }
+.stCaption, [data-testid="stCaptionContainer"] { color: var(--text-muted) !important; font-size: 0.8rem !important; }
+[data-testid="stSpinner"] { color: var(--text-secondary) !important; }
 </style>
 """, unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────
-# JavaScript: auto-scroll + keyboard shortcuts + copy button + subtle glow
+# JavaScript: auto-scroll + keyboard shortcuts + copy button
 # ──────────────────────────────────────────────
 components.html("""
 <script>
 (function() {
     const stDoc = window.parent.document;
-
-    /* ── SUBTLE CURSOR GLOW ── */
-    stDoc.querySelectorAll('#cursor-glow-live').forEach(el => el.remove());
-    const glowEl = stDoc.createElement('div');
-    glowEl.id = 'cursor-glow-live';
-    glowEl.style.cssText = `
-        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-        pointer-events: none; z-index: 9998; transition: background 0.3s ease;
-    `;
-    stDoc.body.appendChild(glowEl);
-    stDoc.addEventListener('mousemove', function(e) {
-        glowEl.style.background =
-            `radial-gradient(450px circle at ${e.clientX}px ${e.clientY}px,
-             rgba(34, 197, 94, 0.025), transparent 60%)`;
-    });
 
     /* ── AUTO-SCROLL ── */
     const scrollObserver = new MutationObserver(function(mutations) {
@@ -526,7 +529,6 @@ components.html("""
 
     /* ── KEYBOARD SHORTCUTS ── */
     stDoc.addEventListener('keydown', function(e) {
-        // Ctrl+L → Clear chat (triggers New Chat button)
         if (e.ctrlKey && e.key === 'l') {
             e.preventDefault();
             const btns = stDoc.querySelectorAll('button');
@@ -534,7 +536,6 @@ components.html("""
                 if (b.textContent.trim() === 'New Chat') { b.click(); break; }
             }
         }
-        // Ctrl+K → Focus input
         if (e.ctrlKey && e.key === 'k') {
             e.preventDefault();
             const input = stDoc.querySelector('[data-testid="stChatInput"] textarea');
@@ -551,27 +552,28 @@ components.html("""
             btn.className = 'copy-btn';
             btn.textContent = 'Copy';
             btn.style.cssText = `
-                position: absolute; top: 6px; right: 6px;
-                background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+                position: absolute; top: 8px; right: 8px;
+                background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
                 border-radius: 6px; color: #a1a1aa; font-size: 11px;
-                padding: 3px 10px; cursor: pointer; z-index: 10;
-                font-family: 'Inter', sans-serif; transition: all 0.2s ease;
+                padding: 4px 10px; cursor: pointer; z-index: 10;
+                font-family: 'Inter', sans-serif; transition: all 0.15s ease;
             `;
             btn.addEventListener('mouseenter', function() {
-                btn.style.background = 'rgba(255,255,255,0.14)';
+                btn.style.background = 'rgba(255,255,255,0.1)';
                 btn.style.color = '#f5f5f5';
             });
             btn.addEventListener('mouseleave', function() {
-                btn.style.background = 'rgba(255,255,255,0.08)';
+                btn.style.background = 'rgba(255,255,255,0.05)';
                 btn.style.color = '#a1a1aa';
             });
             btn.addEventListener('click', function() {
                 const code = pre.querySelector('code');
                 const text = code ? code.textContent : pre.textContent;
                 navigator.clipboard.writeText(text).then(function() {
-                    btn.textContent = 'Copied!';
-                    btn.style.color = '#22C55E';
-                    setTimeout(function() { btn.textContent = 'Copy'; btn.style.color = '#a1a1aa'; }, 1500);
+                    btn.textContent = 'Copied';
+                    btn.style.color = '#F5F5F5';
+                    btn.style.background = 'rgba(255,255,255,0.2)';
+                    setTimeout(function() { btn.textContent = 'Copy'; btn.style.color = '#a1a1aa'; btn.style.background = 'rgba(255,255,255,0.05)'; }, 1500);
                 });
             });
             pre.style.position = 'relative';
@@ -579,7 +581,6 @@ components.html("""
         });
     }
 
-    // Run initially and observe for new messages
     addCopyButtons();
     const copyObserver = new MutationObserver(function() {
         setTimeout(addCopyButtons, 200);
@@ -593,17 +594,14 @@ components.html("""
 # Sidebar
 # ──────────────────────────────────────────────
 with st.sidebar:
-    st.title("⟐ Codebase Assistant")
+    st.markdown("<h1>📘 CodebookLM v1.0</h1>", unsafe_allow_html=True)
 
-    # ── File Upload ──
-    st.markdown("---")
-    st.subheader("Upload Codebase")
-
+    # ── Upload ──
     uploaded_files = st.file_uploader(
-        "Upload Python files or a .zip repository",
+        "Upload Codebase",
         accept_multiple_files=True,
         type=["py", "zip"],
-        help="Upload .py files directly or a .zip archive containing your project.",
+        label_visibility="collapsed"
     )
 
     if uploaded_files:
@@ -617,7 +615,7 @@ with st.sidebar:
             target_path = st.session_state.get("upload_path", DEFAULT_CODEBASE_PATH)
             target = Path(target_path)
             if not target.is_dir():
-                st.error(f"No valid directory: {target_path}")
+                st.error(f"Invalid path: {target_path}")
             else:
                 with st.spinner("Indexing codebase..."):
                     try:
@@ -626,17 +624,17 @@ with st.sidebar:
                         if isinstance(result, tuple) and len(result) == 2:
                             _, stats = result
                             st.session_state["index_stats"] = stats
-                        st.success("Index built successfully!")
+                        st.success("Index ready.")
                     except Exception as e:
-                        st.error(f"Indexing failed: {e}")
+                        st.error(f"Failed: {e}")
     with col2:
         if st.button("Rebuild", use_container_width=True):
             target_path = st.session_state.get("upload_path", DEFAULT_CODEBASE_PATH)
             target = Path(target_path)
             if not target.is_dir():
-                st.error(f"No valid directory: {target_path}")
+                st.error(f"Invalid path: {target_path}")
             else:
-                with st.spinner("Rebuilding index..."):
+                with st.spinner("Rebuilding..."):
                     try:
                         import chromadb
                         from config import CHROMA_PERSIST_DIR, CHROMA_COLLECTION_NAME
@@ -650,65 +648,39 @@ with st.sidebar:
                         if isinstance(result, tuple) and len(result) == 2:
                             _, stats = result
                             st.session_state["index_stats"] = stats
-                        st.success("Index rebuilt from scratch.")
+                        st.success("Rebuilt.")
                     except Exception as e:
-                        st.error(f"Rebuild failed: {e}")
+                        st.error(f"Failed: {e}")
 
-    with st.expander("Advanced: Manual Path"):
-        manual_path = st.text_input(
-            "Codebase folder path",
-            value=DEFAULT_CODEBASE_PATH,
-            help="Absolute path to a folder of .py files.",
-        )
-        if st.button("Use This Path", use_container_width=True):
-            st.session_state["upload_path"] = manual_path
-            st.success(f"Path set: {manual_path}")
-
-    # ── Repository & Models Info Card (#2, #6) ──
+    # ── Repository Dashboard ──
     st.markdown("---")
-    st.subheader("Repository & Models")
-
+    st.markdown("<h3>Repository Dashboard</h3>", unsafe_allow_html=True)
+    
     stats = st.session_state.get("index_stats") or get_index_stats()
     if stats:
         st.session_state["index_stats"] = stats
         st.markdown(
             f'<div class="info-card">'
-            f'<span class="label">Repository</span><br>'
-            f'<span class="accent">{stats.get("repo_name", "N/A")}</span><br><br>'
-            f'<span class="label">Status</span><br>'
-            f'<span class="dot-ok">●</span> <span class="value">Indexed</span><br>'
-            f'<span class="label">Files</span> '
-            f'<span class="value">{stats.get("files_indexed", "?")}</span> · '
-            f'<span class="label">Chunks</span> '
-            f'<span class="value">{stats.get("chunks_generated", "?")}</span><br>'
-            f'<span class="label">Built in</span> '
-            f'<span class="value">{stats.get("elapsed_seconds", 0):.1f}s</span><br>'
-            f'<span class="label">Last indexed</span> '
-            f'<span class="value">{stats.get("timestamp", "N/A")[:19]}</span>'
+            f'<span class="label">Repository</span> <span class="accent">{stats.get("repo_name", "N/A")}</span><br>'
+            f'<span class="label">Language</span> <span class="value">Python</span><br>'
+            f'<span class="label">Indexed Files</span> <span class="value">{stats.get("files_indexed", "?")}</span><br>'
+            f'<span class="label">Chunks</span> <span class="value">{stats.get("chunks_generated", "?")}</span><br>'
+            f'<span class="label">Build Time</span> <span class="value">{stats.get("elapsed_seconds", 0):.1f}s</span><br>'
+            f'<span class="label">Last Indexed</span> <span class="value">{stats.get("timestamp", "N/A")[:10]}</span>'
             f'</div>',
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
             '<div class="info-card">'
-            '<span class="label">Repository</span><br>'
-            '<span class="dot-err">●</span> <span class="value">Not Indexed</span>'
+            '<span class="label">Repository</span> <span class="value" style="color:#71717A;">Not Indexed</span>'
             '</div>',
             unsafe_allow_html=True,
         )
 
-    st.markdown(
-        f'<div class="info-card">'
-        f'<span class="label">LLM</span> <span class="value">`{LLM_MODEL}`</span><br>'
-        f'<span class="label">Embeddings</span> <span class="value">`{EMBEDDING_MODEL}`</span><br>'
-        f'<span class="label">Top-K</span> <span class="value">{TOP_K}</span>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
-
-    # ── System Status (#5) ──
+    # ── System Status ──
     st.markdown("---")
-    st.subheader("System Status")
+    st.markdown("<h3>System Status</h3>", unsafe_allow_html=True)
 
     gpu_info = _get_gpu_info()
     ollama_status = check_ollama_status()
@@ -719,74 +691,104 @@ with st.sidebar:
 
     st.markdown(
         f'<div class="info-card">'
-        f'<span class="label">Ollama</span> '
-        f'<span class="{ollama_dot}">●</span> '
-        f'<span class="value">{ollama_text}</span><br>'
-        f'<span class="label">GPU</span> '
-        f'<span class="{gpu_dot}">●</span> '
-        f'<span class="value">{gpu_label}</span><br>'
-        + (f'<span class="label">VRAM</span> '
-           f'<span class="value">{gpu_info["vram_free"]} free / {gpu_info["vram_total"]}</span><br>'
+        f'<span class="label">Ollama</span> <span class="{ollama_dot}">●</span> <span class="value">{ollama_text}</span><br>'
+        f'<span class="label">LLM</span> <span class="value">`{LLM_MODEL}`</span><br>'
+        f'<span class="label">Embeddings</span> <span class="value">`{EMBEDDING_MODEL}`</span><br>'
+        f'<span class="label">GPU</span> <span class="{gpu_dot}">●</span> <span class="value">{gpu_label}</span><br>'
+        + (f'<span class="label">VRAM</span> <span class="value">{gpu_info["vram_free"]}</span><br>'
            if gpu_info["available"] else '')
         + f'</div>',
         unsafe_allow_html=True,
     )
 
-    # ── Chat History ──
+    # ── Session Information ──
     st.markdown("---")
-    st.subheader("Chat History")
-
-    if st.button("New Chat", use_container_width=True):
-        if st.session_state.get("messages"):
-            _save_chat(st.session_state.chat_id, st.session_state.messages)
-        st.session_state.messages = []
-        st.session_state.chat_id = _generate_chat_id()
-        st.session_state["session_start"] = datetime.now().isoformat()
-        st.rerun()
-
-    saved_chats = _list_chats()
-    if saved_chats:
-        for chat in saved_chats[:15]:
-            col_load, col_del = st.columns([5, 1])
-            with col_load:
-                label = f"{chat['title']}  ({chat['message_count']} msgs)"
-                if st.button(label, key=f"load_{chat['id']}", use_container_width=True):
-                    if st.session_state.get("messages"):
-                        _save_chat(st.session_state.chat_id, st.session_state.messages)
-                    loaded = _load_chat(chat["id"])
-                    if loaded:
-                        st.session_state.messages = loaded["messages"]
-                        st.session_state.chat_id = chat["id"]
-                        st.rerun()
-            with col_del:
-                if st.button("X", key=f"del_{chat['id']}"):
-                    _delete_chat(chat["id"])
-                    if st.session_state.get("chat_id") == chat["id"]:
-                        st.session_state.messages = []
-                        st.session_state.chat_id = _generate_chat_id()
-                    st.rerun()
-    else:
-        st.caption("No saved chats yet.")
-
-    # ── Session Info (#11) ──
-    st.markdown("---")
-    st.subheader("Session")
+    st.markdown("<h3>Session Information</h3>", unsafe_allow_html=True)
     msg_count = len(st.session_state.get("messages", []))
+    q_count = sum(1 for m in st.session_state.get("messages", []) if m["role"] == "user")
     session_start = st.session_state.get("session_start", datetime.now().isoformat())
-    repo_loaded = "Yes" if st.session_state.get("engine") else "No"
+    
     st.markdown(
         f'<div class="info-card">'
-        f'<span class="label">Messages</span> <span class="value">{msg_count}</span><br>'
-        f'<span class="label">Repository</span> <span class="value">{repo_loaded}</span><br>'
-        f'<span class="label">Started</span> <span class="value">{session_start[:19]}</span>'
+        f'<span class="label">Questions</span> <span class="value">{q_count}</span><br>'
+        f'<span class="label">Duration</span> <span class="value">{_get_time_duration(session_start)}</span>'
         f'</div>',
         unsafe_allow_html=True,
     )
+    
+    col3, col4 = st.columns(2)
+    with col3:
+        if st.button("New Chat", use_container_width=True):
+            if st.session_state.get("messages"):
+                _save_chat(st.session_state.chat_id, st.session_state.messages)
+            st.session_state.messages = []
+            st.session_state.chat_id = _generate_chat_id()
+            st.session_state["session_start"] = datetime.now().isoformat()
+            st.rerun()
+    with col4:
+        # Chat History expander
+        with st.expander("History", expanded=False):
+            saved_chats = _list_chats()
+            if saved_chats:
+                for chat in saved_chats[:10]:
+                    if st.button(f"{chat['title']} ({chat['message_count']})", key=f"load_{chat['id']}", use_container_width=True):
+                        loaded = _load_chat(chat["id"])
+                        if loaded:
+                            st.session_state.messages = loaded["messages"]
+                            st.session_state.chat_id = chat["id"]
+                            st.rerun()
+            else:
+                st.caption("No history.")
 
-    st.caption("Ctrl+L Clear Chat · Ctrl+K Focus Input")
+    # ── Export Conversation ──
+    st.markdown("---")
+    st.markdown("<h3>Export Conversation</h3>", unsafe_allow_html=True)
+    
+    if st.session_state.get("messages"):
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        export_md = _format_export_content(st.session_state.messages, format="md")
+        export_txt = _format_export_content(st.session_state.messages, format="txt")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            st.download_button(
+                label="Markdown",
+                data=export_md,
+                file_name=f"CodebookLM_v1.0_Conversation_{date_str}.md",
+                mime="text/markdown",
+                use_container_width=True
+            )
+        with c2:
+            st.download_button(
+                label="Text",
+                data=export_txt,
+                file_name=f"CodebookLM_v1.0_Conversation_{date_str}.txt",
+                mime="text/plain",
+                use_container_width=True
+            )
+    else:
+        st.caption("Chat is empty.")
+
+    # ── About Panel ──
+    st.markdown("---")
+    with st.expander("About CodebookLM", expanded=False):
+        st.markdown(
+            "**📘 CodebookLM v1.0**<br>"
+            "Offline AI Codebase Assistant<br><br>"
+            "**Mission:**<br>"
+            "Understand software repositories while keeping all source code completely private using local AI.<br><br>"
+            "**Built With:**<br>"
+            "• Streamlit<br>"
+            "• Ollama<br>"
+            "• LlamaIndex<br>"
+            "• ChromaDB<br>"
+            "• Devstral Small 2<br>"
+            "• Local Embeddings",
+            unsafe_allow_html=True
+        )
 
 # ──────────────────────────────────────────────
-# Session state
+# Session state init
 # ──────────────────────────────────────────────
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -809,44 +811,36 @@ if st.session_state.engine is None:
 # ──────────────────────────────────────────────
 # Main Panel
 # ──────────────────────────────────────────────
-st.title("Codebase Assistant")
-st.caption("Ask anything — codebase questions use your indexed code, general questions get direct answers.")
 
-# Status badge
-if st.session_state.engine:
-    st.markdown(
-        '<span class="status-badge status-ready">● Index loaded — ready</span>',
-        unsafe_allow_html=True,
-    )
-else:
-    st.markdown(
-        '<span class="status-badge status-none">○ No index — upload files and build one</span>',
-        unsafe_allow_html=True,
-    )
-
-# ──────────────────────────────────────────────
-# Empty state: Onboarding view (#10) or Example Questions (#7)
-# ──────────────────────────────────────────────
+# Empty state: Onboarding view or Example Questions
 if not st.session_state.messages:
     if not st.session_state.engine:
         # Onboarding
         st.markdown(
             '<div class="onboarding">'
-            '<h2>Get Started</h2>'
-            '<p>Index your Python codebase and ask questions about it.</p>'
-            '<div class="step">📁 Upload a Python repository</div>'
-            '<div class="arrow">↓</div>'
-            '<div class="step">⚡ Build Index</div>'
-            '<div class="arrow">↓</div>'
-            '<div class="step">💬 Ask questions about your code</div>'
-            '<div class="arrow">↓</div>'
-            '<div class="step">🎯 Receive grounded answers using RAG</div>'
+            '<h2>Welcome to CodebookLM</h2>'
+            '<div class="step-container">'
+            '<div class="step"><span>①</span> Upload Repository</div>'
+            '<div class="step"><span>②</span> Build Semantic Index</div>'
+            '<div class="step"><span>③</span> Ask Questions</div>'
+            '<div class="step"><span>④</span> Inspect Sources</div>'
+            '<div class="step"><span>⑤</span> Understand Architecture</div>'
+            '</div>'
             '</div>',
             unsafe_allow_html=True,
         )
     else:
-        # Example questions
-        st.markdown("#### Try an example question")
+        # Hero section when ready
+        st.markdown('<h1 class="hero-title">📘 CodebookLM v1.0</h1>', unsafe_allow_html=True)
+        st.markdown('<p class="hero-subtitle">Offline AI Codebase Assistant</p>', unsafe_allow_html=True)
+        st.markdown('<p class="hero-desc">Understand • Explore • Explain • Navigate software repositories using Local LLMs.</p>', unsafe_allow_html=True)
+        
+        st.markdown(
+            '<span class="status-badge status-ready">● Index loaded — Ready</span>',
+            unsafe_allow_html=True,
+        )
+        
+        st.markdown("<br><h4>Try an example question</h4>", unsafe_allow_html=True)
         cols = st.columns(2)
         for i, q in enumerate(EXAMPLE_QUESTIONS):
             with cols[i % 2]:
@@ -871,7 +865,7 @@ for msg in st.session_state.messages:
 # Chat input with thinking steps + streaming
 # ──────────────────────────────────────────────
 pending = st.session_state.pop("_pending_question", None)
-question = pending or st.chat_input("Ask about the codebase or anything else...")
+question = pending or st.chat_input("Ask about the codebase...")
 
 if question:
     if not st.session_state.engine:
@@ -884,7 +878,7 @@ if question:
 
         # Generate answer with thinking steps
         with st.chat_message("assistant"):
-            with st.status("Processing your question...", expanded=True) as status:
+            with st.status("Processing...", expanded=True) as status:
                 def on_progress(step_msg):
                     st.write(f"✓ {step_msg}")
 
@@ -909,10 +903,7 @@ if question:
             if badge_html:
                 st.markdown(badge_html, unsafe_allow_html=True)
 
-            # Stream-style rendering (write_stream not available, use markdown)
             st.markdown(answer)
-
-            # Source attribution
             _render_sources(sources, mode)
 
         # Save to history
@@ -923,15 +914,14 @@ if question:
             "mode": mode,
             "confidence": confidence,
         })
-
         _save_chat(st.session_state.chat_id, st.session_state.messages)
 
 # ──────────────────────────────────────────────
-# Footer (#12)
+# Footer
 # ──────────────────────────────────────────────
 st.markdown(
     '<div class="footer">'
-    'Offline · Local LLM · Retrieval-Augmented Generation · No Internet Required'
+    '📘 CodebookLM v1.0 &nbsp;&nbsp;|&nbsp;&nbsp; Offline &nbsp;&nbsp;•&nbsp;&nbsp; Private &nbsp;&nbsp;•&nbsp;&nbsp; Local AI &nbsp;&nbsp;•&nbsp;&nbsp; No Internet Required'
     '</div>',
     unsafe_allow_html=True,
 )

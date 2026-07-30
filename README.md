@@ -9,9 +9,14 @@ CodebookLM is an offline AI-powered software repository assistant that enables d
 
 ## Overview
 
-CodebookLM is designed to give you a "ChatGPT-like" experience over your own codebase without sending a single line of code to the cloud. It builds a local semantic index of your repository and uses a local Large Language Model (like Mistral or LLaMA) to answer complex architectural and implementation questions. 
+CodebookLM is a state-of-the-art, fully offline AI-powered software repository assistant. It empowers developers, researchers, and engineers to interact with their codebases using natural language, much like ChatGPT, but explicitly tailored to complex software architecture—without a single byte of code ever leaving your machine. 
 
-It is built for privacy, speed, and accuracy—providing source code attribution for every answer so you can trust its output and navigate directly to the relevant files.
+By building a local semantic index of your repository using Advanced AST parsing and utilizing a local Large Language Model (defaulting to the highly capable `devstral-small-2:24b`), CodebookLM can answer intricate architectural questions, trace implementation logic across multiple files, and summarize extensive codebases instantly.
+
+It prioritizes:
+1. **Privacy & Security**: Perfect for enterprise environments, proprietary code, or defense applications where cloud-based LLMs are prohibited.
+2. **Transparency**: Every answer generated from your codebase includes explicit source attribution (File path, Line numbers, and Relevance scores).
+3. **Speed & UX**: Designed with a beautiful, minimal, dark-mode desktop UI inspired by developer-first tools like Linear and Cursor.
 
 ## Features
 
@@ -89,7 +94,13 @@ python -m streamlit run app.py
 
 ## Screenshots
 
-*(Add screenshots of the UI here)*
+### 1. Main Dashboard & Chat Interface
+![CodebookLM Dashboard](assets/screenshot1.png)
+*The clean, minimal, Linear-inspired dark interface with system diagnostics and repository status on the sidebar.*
+
+### 2. Retrieval in Action
+![CodebookLM Query Response](assets/screenshot2.png)
+*Detailed streaming responses with confidence metrics and general knowledge fallbacks when code isn't relevant.*
 
 ## Troubleshooting
 

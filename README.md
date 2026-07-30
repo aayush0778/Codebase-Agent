@@ -114,10 +114,6 @@ python -m streamlit run app.py
 - Direct GitHub repository ingestion via URL.
 - Persistent multiple repository indexing.
 
-## License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
-
 ## Credits
 
 Designed and built for developers who care about code privacy and AI accessibility.

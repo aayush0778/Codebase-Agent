@@ -871,6 +871,13 @@ if question:
     if not st.session_state.engine:
         st.warning("Please build an index first using the sidebar.")
     else:
+        # Capture recent history for context before appending the new user message
+        history_for_ask = [
+            {"question": m["content"], "answer": st.session_state.messages[i+1]["content"]}
+            for i, m in enumerate(st.session_state.messages[:-1])
+            if m["role"] == "user" and st.session_state.messages[i+1]["role"] == "assistant"
+        ]
+
         # Add user message
         st.session_state.messages.append({"role": "user", "content": question})
         with st.chat_message("user"):
@@ -887,6 +894,7 @@ if question:
                     answer, sources, mode, best_score = ask(
                         st.session_state.engine,
                         question,
+                        history=history_for_ask,
                         progress_fn=on_progress,
                     )
                     status.update(label="Complete", state="complete", expanded=False)

@@ -22,6 +22,8 @@ DEFAULT_CODEBASE_PATH = str(PROJECT_ROOT / "sample_codebase")
 EMBEDDING_MODEL = "nomic-embed-text"
 LLM_MODEL = "llama3"                   # LOCAL TESTING — production: "devstral-small-2:24b"
 LLM_REQUEST_TIMEOUT = 300.0          # seconds (higher for CPU-only inference)
+LLM_CONTEXT_WINDOW = 8192            # Ollama context window size
+MAX_HISTORY_TURNS = 4                # Number of past Q&A exchanges to include in history
 
 # ──────────────────────────────────────────────
 # Retrieval Settings

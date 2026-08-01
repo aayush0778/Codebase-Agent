@@ -36,6 +36,8 @@ from config import (
     QUERY_LOG_FILE,
     RELEVANCE_THRESHOLD,
     NOT_FOUND_PHRASES,
+    LLM_CONTEXT_WINDOW,
+    MAX_HISTORY_TURNS,
 )
 
 logger = logging.getLogger(__name__)
@@ -68,7 +70,11 @@ def _get_llm(llm_model=None):
     if llm_model is None:
         llm_model = LLM_MODEL
     if _llm_instance is None or _llm_instance.model != llm_model:
-        _llm_instance = Ollama(model=llm_model, request_timeout=LLM_REQUEST_TIMEOUT)
+        _llm_instance = Ollama(
+            model=llm_model, 
+            request_timeout=LLM_REQUEST_TIMEOUT,
+            context_window=LLM_CONTEXT_WINDOW,
+        )
     return _llm_instance
 
 
@@ -142,15 +148,16 @@ def _answer_says_not_found(answer_text):
 # General-knowledge fallback (direct LLM call)
 # ──────────────────────────────────────────────
 
-def _ask_general(question):
+def _ask_general(question, history_text=""):
     """Send the question directly to the LLM without any code context.
 
     Returns:
         The answer string from the LLM.
     """
     llm = _get_llm()
+    context_block = f"\nRecent conversation:\n{history_text}\n" if history_text else ""
     prompt = f"""{GENERAL_SYSTEM_PROMPT}
-
+{context_block}
 Question: {question}
 
 Answer:"""
@@ -164,7 +171,17 @@ Answer:"""
 # Main ask function (hybrid: RAG + general)
 # ──────────────────────────────────────────────
 
-def ask(query_engine, question, progress_fn=None):
+def _format_history(history):
+    if not history:
+        return ""
+    lines = []
+    for turn in history[-MAX_HISTORY_TURNS:]:
+        lines.append(f"User: {turn['question']}")
+        lines.append(f"Assistant: {turn['answer']}")
+    return "\n".join(lines)
+
+
+def ask(query_engine, question, history=None, progress_fn=None):
     """Ask a question with automatic fallback to general knowledge.
 
     Flow:
@@ -191,9 +208,12 @@ def ask(query_engine, question, progress_fn=None):
 
     logger.info("Question: %s", question)
 
+    history_text = _format_history(history)
+    effective_query = f"{history_text}\nUser: {question}" if history_text else question
+
     # Step 1: Retrieve relevant code chunks
     _progress("Searching codebase for relevant code...")
-    response = query_engine.query(question)
+    response = query_engine.query(effective_query)
 
     best_score = _get_best_score(response.source_nodes)
     num_chunks = len(response.source_nodes)
@@ -215,7 +235,7 @@ def ask(query_engine, question, progress_fn=None):
         )
         try:
             _progress("Generating answer from general knowledge...")
-            general_answer = _ask_general(question)
+            general_answer = _ask_general(question, history_text)
             mode = "general"
             answer_text = general_answer
             sources = []

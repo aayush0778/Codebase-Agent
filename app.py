@@ -53,23 +53,45 @@ def _generate_chat_id():
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 def _get_chat_title(messages):
-    """Extract a title from the first user message, or return a default."""
+    """Extract a smart title from the first user message."""
+    _STRIP_PREFIXES = [
+        "explain ", "what is ", "how does ", "how do ", "how to ",
+        "what are ", "why is ", "why does ", "can you ", "please ",
+        "tell me ", "describe ", "show me ", "give me ",
+    ]
     for msg in messages:
         if msg["role"] == "user":
-            title = msg["content"][:50]
-            if len(msg["content"]) > 50:
-                title += "..."
-            return title
+            text = msg["content"].strip()
+            lower = text.lower()
+            for prefix in _STRIP_PREFIXES:
+                if lower.startswith(prefix):
+                    text = text[len(prefix):]
+                    break
+            # Capitalize first letter, truncate
+            text = text[:1].upper() + text[1:] if text else text
+            if len(text) > 40:
+                text = text[:37] + "..."
+            return text or "New chat"
     return "Empty chat"
 
-def _save_chat(chat_id, messages):
+def _save_chat(chat_id, messages, custom_title=None, pinned=None):
     """Save a chat session to disk as JSON."""
     if not messages:
         return
     filepath = os.path.join(CHAT_HISTORY_DIR, f"{chat_id}.json")
+    # Load existing data to preserve extra fields
+    existing = {}
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            pass
     data = {
         "id": chat_id,
-        "title": _get_chat_title(messages),
+        "title": custom_title or existing.get("custom_title") or _get_chat_title(messages),
+        "custom_title": custom_title or existing.get("custom_title"),
+        "pinned": pinned if pinned is not None else existing.get("pinned", False),
         "updated": datetime.now().isoformat(),
         "message_count": len(messages),
         "messages": messages,
@@ -86,7 +108,7 @@ def _load_chat(chat_id):
         return json.load(f)
 
 def _list_chats():
-    """List all saved chats, sorted by most recent first."""
+    """List all saved chats, pinned first then sorted by most recent."""
     chats = []
     for fname in os.listdir(CHAT_HISTORY_DIR):
         if fname.endswith(".json"):
@@ -96,14 +118,22 @@ def _list_chats():
                     data = json.load(f)
                 chats.append({
                     "id": data.get("id", fname.replace(".json", "")),
-                    "title": data.get("title", "Untitled"),
+                    "title": data.get("custom_title") or data.get("title", "Untitled"),
                     "updated": data.get("updated", ""),
                     "message_count": data.get("message_count", 0),
+                    "pinned": data.get("pinned", False),
                 })
             except (json.JSONDecodeError, KeyError):
                 continue
-    chats.sort(key=lambda c: c["updated"], reverse=True)
-    return chats
+    # Pinned first, then by recency
+    chats.sort(key=lambda c: (not c.get("pinned", False), c.get("updated", "")), reverse=False)
+    chats.sort(key=lambda c: c.get("pinned", False), reverse=True)
+    # Within each group, most recent first
+    pinned = [c for c in chats if c.get("pinned")]
+    unpinned = [c for c in chats if not c.get("pinned")]
+    pinned.sort(key=lambda c: c.get("updated", ""), reverse=True)
+    unpinned.sort(key=lambda c: c.get("updated", ""), reverse=True)
+    return pinned + unpinned
 
 def _delete_chat(chat_id):
     """Delete a saved chat from disk."""
@@ -865,29 +895,84 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
     
+    # ── Conversation History ──
+    st.markdown("---")
+    st.markdown("<h3>Conversations</h3>", unsafe_allow_html=True)
+
     col3, col4 = st.columns(2)
     with col3:
-        if st.button("New Chat", use_container_width=True):
+        if st.button("✦ New Chat", use_container_width=True):
             if st.session_state.get("messages"):
                 _save_chat(st.session_state.chat_id, st.session_state.messages)
             st.session_state.messages = []
             st.session_state.chat_id = _generate_chat_id()
             st.session_state["session_start"] = datetime.now().isoformat()
             st.rerun()
-    with col4:
-        # Chat History expander
-        with st.expander("History", expanded=False):
-            saved_chats = _list_chats()
-            if saved_chats:
-                for chat in saved_chats[:10]:
-                    if st.button(f"{chat['title']} ({chat['message_count']})", key=f"load_{chat['id']}", use_container_width=True):
-                        loaded = _load_chat(chat["id"])
-                        if loaded:
-                            st.session_state.messages = loaded["messages"]
-                            st.session_state.chat_id = chat["id"]
-                            st.rerun()
-            else:
-                st.caption("No history.")
+
+    # Search filter
+    chat_search = st.text_input(
+        "Search", placeholder="Filter conversations...",
+        label_visibility="collapsed", key="chat_search_input"
+    )
+
+    saved_chats = _list_chats()
+    if chat_search:
+        saved_chats = [c for c in saved_chats if chat_search.lower() in c["title"].lower()]
+
+    if saved_chats:
+        for chat in saved_chats[:15]:
+            # Relative timestamp
+            try:
+                updated_dt = datetime.fromisoformat(chat["updated"])
+                delta = datetime.now() - updated_dt
+                if delta.total_seconds() < 60:
+                    time_label = "just now"
+                elif delta.total_seconds() < 3600:
+                    time_label = f"{int(delta.total_seconds() // 60)}m ago"
+                elif delta.total_seconds() < 86400:
+                    time_label = f"{int(delta.total_seconds() // 3600)}h ago"
+                elif delta.days == 1:
+                    time_label = "Yesterday"
+                else:
+                    time_label = f"{delta.days}d ago"
+            except (ValueError, TypeError):
+                time_label = ""
+
+            pin_icon = "📌 " if chat.get("pinned") else ""
+            is_active = chat["id"] == st.session_state.get("chat_id", "")
+
+            # Chat entry row
+            c_load, c_pin, c_del = st.columns([7, 1, 1])
+            with c_load:
+                label = f"{pin_icon}{chat['title']}"
+                if time_label:
+                    label += f" · {time_label}"
+                if st.button(label, key=f"load_{chat['id']}", use_container_width=True,
+                             disabled=is_active):
+                    if st.session_state.get("messages"):
+                        _save_chat(st.session_state.chat_id, st.session_state.messages)
+                    loaded = _load_chat(chat["id"])
+                    if loaded:
+                        st.session_state.messages = loaded["messages"]
+                        st.session_state.chat_id = chat["id"]
+                        st.rerun()
+            with c_pin:
+                pin_label = "📌" if not chat.get("pinned") else "✕"
+                if st.button(pin_label, key=f"pin_{chat['id']}"):
+                    loaded = _load_chat(chat["id"])
+                    if loaded:
+                        new_pinned = not chat.get("pinned", False)
+                        _save_chat(chat["id"], loaded["messages"], pinned=new_pinned)
+                        st.rerun()
+            with c_del:
+                if st.button("✕", key=f"del_{chat['id']}"):
+                    _delete_chat(chat["id"])
+                    if chat["id"] == st.session_state.get("chat_id"):
+                        st.session_state.messages = []
+                        st.session_state.chat_id = _generate_chat_id()
+                    st.rerun()
+    else:
+        st.caption("No conversations yet.")
 
     # ── Export Conversation ──
     st.markdown("---")

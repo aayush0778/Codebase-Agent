@@ -466,6 +466,23 @@ p.hero-desc {
     transform: scale(0.97) translateY(0) !important;
     transition-duration: 80ms !important;
 }
+.stButton > button:focus-visible {
+    box-shadow: 0 0 0 2px var(--accent-dim), 0 0 0 4px rgba(52,211,153,0.1) !important;
+    outline: none !important;
+}
+.stButton > button:disabled, .stButton > button[disabled] {
+    opacity: 0.35 !important; cursor: not-allowed !important;
+    pointer-events: none !important; transform: none !important;
+}
+section[data-testid="stSidebar"] .stButton > button {
+    background: transparent !important; border-color: transparent !important;
+    text-align: left !important; box-shadow: none !important;
+}
+section[data-testid="stSidebar"] .stButton > button:hover {
+    background: rgba(255,255,255,0.05) !important;
+    border-color: transparent !important; transform: none !important;
+    box-shadow: none !important;
+}
 
 /* ── EXPANDER ── */
 [data-testid="stExpander"] {
@@ -488,11 +505,17 @@ p.hero-desc {
     background: var(--bg-card) !important; border: 1px solid var(--border) !important;
     border-radius: var(--radius-sm) !important; font-size: 0.85rem !important;
     padding: 10px 14px !important; text-align: left !important; color: var(--text-secondary) !important;
-    transition: all 0.15s ease !important; width: 100% !important;
+    transition: all 200ms var(--ease-smooth) !important; width: 100% !important;
 }
 .example-btn button:hover {
-    border-color: rgba(255,255,255,0.2) !important; color: var(--text-primary) !important;
-    background: var(--bg-hover) !important;
+    border-color: var(--border-hover) !important; color: var(--text-primary) !important;
+    background: var(--bg-hover) !important; box-shadow: var(--shadow-sm) !important;
+}
+.example-btn button:active {
+    transform: scale(0.98) !important; transition-duration: 80ms !important;
+}
+.example-btn button:focus-visible {
+    box-shadow: 0 0 0 2px var(--accent-dim) !important; outline: none !important;
 }
 
 /* ── ONBOARDING ── */

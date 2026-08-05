@@ -495,8 +495,79 @@ p.hero-desc {
 hr { border-color: var(--border) !important; margin: 1.5rem 0 !important; }
 .stCaption, [data-testid="stCaptionContainer"] { color: var(--text-muted) !important; font-size: 0.8rem !important; }
 [data-testid="stSpinner"] { color: var(--text-secondary) !important; }
+
+/* ── SPLASH SCREEN ── */
+#cb-splash {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    z-index: 99999; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: var(--bg-base, #0F1115);
+    animation: splashSequence 2.8s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+}
+#cb-splash .splash-icon {
+    font-size: 3.4rem; line-height: 1;
+    animation: splashGlow 2.8s ease forwards;
+    filter: brightness(0.6);
+}
+#cb-splash .splash-title {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 1.7rem; font-weight: 650; letter-spacing: -0.03em;
+    color: #F5F5F5; margin-top: 20px;
+    opacity: 0; animation: splashFadeUp 550ms 280ms ease forwards;
+}
+#cb-splash .splash-tagline {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 0.88rem; font-weight: 400; letter-spacing: 0.01em;
+    color: #71717A; margin-top: 10px;
+    opacity: 0; animation: splashFadeUp 550ms 480ms ease forwards;
+}
+#cb-splash .splash-divider {
+    width: 52px; height: 1px;
+    background: rgba(255,255,255,0.08); margin-top: 28px;
+    opacity: 0; animation: splashFadeUp 450ms 620ms ease forwards;
+}
+@keyframes splashSequence {
+    0%   { opacity: 0; }
+    10%  { opacity: 1; }
+    70%  { opacity: 1; }
+    100% { opacity: 0; pointer-events: none; visibility: hidden; }
+}
+@keyframes splashGlow {
+    0%   { transform: scale(0.90); filter: brightness(0.5); }
+    14%  { transform: scale(1.0);  filter: brightness(1.0); }
+    28%  { transform: scale(1.04); filter: brightness(1.2) drop-shadow(0 0 24px rgba(34,197,94,0.3)); }
+    42%  { transform: scale(1.0);  filter: brightness(1.0) drop-shadow(0 0 0 transparent); }
+    100% { transform: scale(1.0);  filter: brightness(1.0); }
+}
+@keyframes splashFadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    #cb-splash, #cb-splash .splash-icon,
+    #cb-splash .splash-title, #cb-splash .splash-tagline,
+    #cb-splash .splash-divider {
+        animation-duration: 0.01ms !important;
+        animation-delay: 0ms !important;
+    }
+}
 </style>
 """, unsafe_allow_html=True)
+
+# ──────────────────────────────────────────────
+# Splash screen (first load only)
+# ──────────────────────────────────────────────
+if not st.session_state.get("_splash_shown", False):
+    st.session_state["_splash_shown"] = True
+    st.markdown(
+        '<div id="cb-splash">'
+        '<span class="splash-icon">📘</span>'
+        '<span class="splash-title">CodebookLM</span>'
+        '<span class="splash-tagline">Understand Any Codebase. Instantly.</span>'
+        '<span class="splash-divider"></span>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
 # ──────────────────────────────────────────────
 # JavaScript: auto-scroll + keyboard shortcuts + copy button
@@ -505,6 +576,16 @@ components.html("""
 <script>
 (function() {
     const stDoc = window.parent.document;
+
+    /* ── SPLASH CLEANUP ── */
+    var splashEl = stDoc.getElementById('cb-splash');
+    if (splashEl) {
+        setTimeout(function() {
+            if (splashEl && splashEl.parentNode) {
+                splashEl.parentNode.removeChild(splashEl);
+            }
+        }, 3200);
+    }
 
     /* ── AUTO-SCROLL ── */
     const scrollObserver = new MutationObserver(function(mutations) {

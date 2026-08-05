@@ -65,8 +65,8 @@ graph TD
 
 ### 2. Install Dependencies
 ```bash
-git clone https://github.com/aayush0778/Codebase-Agent.git
-cd Codebase-Agent
+git clone https://github.com/aayush0778/CodebookLM.git
+cd CodebookLM
 pip install -r requirements.txt
 ```
 

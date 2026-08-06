@@ -25,6 +25,7 @@ from retrieval.query_engine import (
 from config import (
     DEFAULT_CODEBASE_PATH, LLM_MODEL, TOP_K, EMBEDDING_MODEL,
     DATA_DIR, RELEVANCE_THRESHOLD,
+    STYLE_PROFILES, DEFAULT_STYLE_PROFILE,
 )
 
 # ──────────────────────────────────────────────
@@ -998,6 +999,22 @@ with st.sidebar:
         f'</div>',
         unsafe_allow_html=True,
     )
+
+    # ── Response Style ──
+    st.markdown("---")
+    st.markdown("<h3>Response Style</h3>", unsafe_allow_html=True)
+    style_keys = list(STYLE_PROFILES.keys())
+    style_names = [STYLE_PROFILES[k]["name"] for k in style_keys]
+    current_idx = style_keys.index(
+        st.session_state.get("style_profile", DEFAULT_STYLE_PROFILE)
+    ) if st.session_state.get("style_profile", DEFAULT_STYLE_PROFILE) in style_keys else 0
+    selected_style_name = st.selectbox(
+        "Style", style_names, index=current_idx,
+        label_visibility="collapsed", key="style_selectbox"
+    )
+    selected_key = style_keys[style_names.index(selected_style_name)]
+    st.session_state["style_profile"] = selected_key
+    st.caption(STYLE_PROFILES[selected_key]["description"])
     
     # ── Conversation History ──
     st.markdown("---")
@@ -1239,6 +1256,7 @@ if question:
                         question,
                         history=history_for_ask,
                         progress_fn=on_progress,
+                        style_profile=st.session_state.get("style_profile", DEFAULT_STYLE_PROFILE),
                     )
                     status.update(label="Complete", state="complete", expanded=False)
                 except Exception as e:

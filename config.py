@@ -68,3 +68,46 @@ accurately, and concisely. You can answer questions on any topic including
 programming, science, math, history, and general knowledge.
 If you are unsure, say so rather than guessing.\
 """
+
+# ──────────────────────────────────────────────
+# Style Profiles
+# ──────────────────────────────────────────────
+DEFAULT_STYLE_PROFILE = "concise"
+
+STYLE_PROFILES = {
+    "concise": {
+        "name": "⚡ Concise",
+        "description": "Short, direct answers with minimal explanation.",
+        "prompt_modifier": (
+            "\nKeep your answer concise and to the point. "
+            "Use bullet points where appropriate. Avoid unnecessary elaboration."
+        ),
+    },
+    "detailed": {
+        "name": "📖 Detailed",
+        "description": "Comprehensive explanations with examples.",
+        "prompt_modifier": (
+            "\nProvide a thorough, detailed explanation. "
+            "Include code examples where helpful. Explain the reasoning "
+            "behind design decisions and patterns you identify."
+        ),
+    },
+    "tutorial": {
+        "name": "🎓 Tutorial",
+        "description": "Step-by-step explanations for learning.",
+        "prompt_modifier": (
+            "\nExplain step-by-step as if teaching a junior developer. "
+            "Define technical terms. Use numbered steps and simple language. "
+            "Include 'why' explanations, not just 'what'."
+        ),
+    },
+    "review": {
+        "name": "🔍 Code Review",
+        "description": "Focus on quality, bugs, and improvements.",
+        "prompt_modifier": (
+            "\nAnalyze the code like a senior code reviewer. "
+            "Point out potential bugs, anti-patterns, performance issues, "
+            "and suggest improvements. Be constructive but thorough."
+        ),
+    },
+}

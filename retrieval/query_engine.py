@@ -38,6 +38,8 @@ from config import (
     NOT_FOUND_PHRASES,
     LLM_CONTEXT_WINDOW,
     MAX_HISTORY_TURNS,
+    STYLE_PROFILES,
+    DEFAULT_STYLE_PROFILE,
 )
 
 logger = logging.getLogger(__name__)
@@ -181,7 +183,7 @@ def _format_history(history):
     return "\n".join(lines)
 
 
-def ask(query_engine, question, history=None, progress_fn=None):
+def ask(query_engine, question, history=None, progress_fn=None, style_profile=None):
     """Ask a question with automatic fallback to general knowledge.
 
     Flow:
@@ -196,9 +198,10 @@ def ask(query_engine, question, history=None, progress_fn=None):
         question: The natural-language question to ask.
         progress_fn: Optional callback function(step_message: str) to
                      report progress to the UI in real time.
+        style_profile: Optional style profile key (e.g. 'concise', 'detailed').
 
     Returns:
-        A tuple of (answer_text, sources_list, mode).
+        A tuple of (answer_text, sources_list, mode, best_score).
         sources_list contains dicts with file, name, type, line, score.
         If mode == "general", sources_list will be empty.
     """
@@ -208,8 +211,16 @@ def ask(query_engine, question, history=None, progress_fn=None):
 
     logger.info("Question: %s", question)
 
+    # Resolve style modifier
+    style_key = style_profile or DEFAULT_STYLE_PROFILE
+    style_modifier = ""
+    if style_key in STYLE_PROFILES:
+        style_modifier = STYLE_PROFILES[style_key].get("prompt_modifier", "")
+
     history_text = _format_history(history)
     effective_query = f"{history_text}\nUser: {question}" if history_text else question
+    if style_modifier:
+        effective_query = f"[Style: {style_key}]{style_modifier}\n\n{effective_query}"
 
     # Step 1: Retrieve relevant code chunks
     _progress("Searching codebase for relevant code...")

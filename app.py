@@ -256,6 +256,25 @@ def _render_sources(sources, mode):
             unsafe_allow_html=True,
         )
 
+def _render_response_actions(msg_index, first_user_msg=""):
+    """Render follow-up action buttons under an assistant response.
+    
+    Actions prefill the chat input via session_state (never auto-invoke).
+    """
+    actions = [
+        ("💡 Explain more", f"Explain this in more detail: {first_user_msg}"),
+        ("📝 Show examples", f"Show code examples for: {first_user_msg}"),
+        ("🔗 Related code", f"What related code is connected to: {first_user_msg}"),
+    ]
+    cols = st.columns(len(actions))
+    for col, (label, prompt) in zip(cols, actions):
+        with col:
+            st.markdown('<div class="response-actions"><div class="action-btn">', unsafe_allow_html=True)
+            if st.button(label, key=f"action_{msg_index}_{label[:6]}"):
+                st.session_state["_pending_question"] = prompt
+                st.rerun()
+            st.markdown('</div></div>', unsafe_allow_html=True)
+
 def _get_time_duration(start_iso):
     """Calculate duration string from iso start time."""
     try:
@@ -546,6 +565,29 @@ section[data-testid="stSidebar"] .stButton > button:hover {
 }
 .example-btn button:focus-visible {
     box-shadow: 0 0 0 2px var(--accent-dim) !important; outline: none !important;
+}
+
+/* ── RESPONSE ACTIONS ── */
+.response-actions {
+    display: flex; gap: 8px; margin-top: 12px; padding-top: 10px;
+    border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.04));
+    flex-wrap: wrap;
+}
+.response-actions .action-btn button {
+    background: var(--glass, rgba(255,255,255,0.02)) !important;
+    border: 1px solid var(--border, rgba(255,255,255,0.06)) !important;
+    border-radius: 20px !important; padding: 4px 14px !important;
+    font-size: 0.76rem !important; color: var(--text-muted, #5C6478) !important;
+    font-weight: 500 !important; transition: all 200ms var(--ease-smooth) !important;
+    white-space: nowrap !important;
+}
+.response-actions .action-btn button:hover {
+    background: rgba(52,211,153,0.06) !important;
+    border-color: var(--accent-border, rgba(52,211,153,0.18)) !important;
+    color: var(--accent, #34D399) !important; transform: translateY(-1px) !important;
+}
+.response-actions .action-btn button:active {
+    transform: scale(0.97) !important; transition-duration: 80ms !important;
 }
 
 /* ── ONBOARDING ── */
@@ -1085,7 +1127,7 @@ if not st.session_state.messages:
 # ──────────────────────────────────────────────
 # Chat history display
 # ──────────────────────────────────────────────
-for msg in st.session_state.messages:
+for i, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"]):
         if msg["role"] == "assistant" and msg.get("mode"):
             badge_html = _render_mode_badge(msg["mode"], msg.get("confidence"))
@@ -1094,6 +1136,11 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
         if msg["role"] == "assistant":
             _render_sources(msg.get("sources", []), msg.get("mode", ""))
+            # Find the user question that preceded this response
+            user_q = ""
+            if i > 0 and st.session_state.messages[i-1]["role"] == "user":
+                user_q = st.session_state.messages[i-1]["content"][:60]
+            _render_response_actions(i, user_q)
 
 # ──────────────────────────────────────────────
 # Chat input with thinking steps + streaming
@@ -1147,6 +1194,7 @@ if question:
 
             st.markdown(answer)
             _render_sources(sources, mode)
+            _render_response_actions(len(st.session_state.messages), question[:60])
 
         # Save to history
         st.session_state.messages.append({

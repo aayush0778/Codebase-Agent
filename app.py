@@ -220,14 +220,45 @@ def _get_gpu_info():
     return {"available": False, "name": "N/A", "vram_total": "N/A", "vram_free": "N/A"}
 
 
-def _render_mode_badge(mode, confidence=None):
-    """Render an HTML mode badge based on answer mode and confidence."""
+def _render_mode_badge(mode, confidence=None, num_sources=0):
+    """Render an HTML mode badge with optional confidence indicator.
+    
+    Quality indicators are labeled as heuristics, never as model certainty.
+    Title: 'Response Confidence Indicators' with disclaimer.
+    """
     if mode == "code":
-        conf_text = f" (Confidence {int(confidence * 100)}%)" if confidence else ""
-        return (
-            f'<span class="mode-badge mode-code">'
-            f'&#x1F7E2; Codebase{conf_text}</span>'
-        )
+        if confidence is not None:
+            pct = int(confidence * 100)
+            if pct >= 70:
+                bar_color = "var(--accent, #34D399)"
+                level = "High"
+            elif pct >= 40:
+                bar_color = "var(--yellow-text, #fde047)"
+                level = "Medium"
+            else:
+                bar_color = "#f87171"
+                level = "Low"
+            conf_html = (
+                f'<div class="confidence-panel">'
+                f'<div class="confidence-header">'
+                f'<span class="mode-badge mode-code">&#x1F7E2; Codebase</span>'
+                f'<span class="confidence-label">{level} Relevance · {pct}%</span>'
+                f'</div>'
+                f'<div class="confidence-bar-track">'
+                f'<div class="confidence-bar-fill" style="width:{pct}%; background:{bar_color};"></div>'
+                f'</div>'
+                f'<div class="confidence-meta">'
+                f'{num_sources} source{"s" if num_sources != 1 else ""} referenced'
+                f' · <span class="confidence-disclaimer">Heuristic estimate based on retrieval similarity</span>'
+                f'</div>'
+                f'</div>'
+            )
+            return conf_html
+        else:
+            return (
+                f'<span class="mode-badge mode-code">'
+                f'&#x1F7E2; Codebase</span>'
+            )
     elif mode == "general":
         return (
             '<span class="mode-badge mode-general">'
@@ -588,6 +619,37 @@ section[data-testid="stSidebar"] .stButton > button:hover {
 }
 .response-actions .action-btn button:active {
     transform: scale(0.97) !important; transition-duration: 80ms !important;
+}
+
+/* ── CONFIDENCE INDICATOR ── */
+.confidence-panel {
+    padding: 10px 14px; margin-bottom: 10px;
+    background: var(--glass, rgba(255,255,255,0.02));
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.04));
+    border-radius: var(--radius-sm, 8px);
+}
+.confidence-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+}
+.confidence-label {
+    font-size: 0.78rem; font-weight: 500;
+    color: var(--text-secondary, #8B95A8);
+}
+.confidence-bar-track {
+    width: 100%; height: 4px; border-radius: 2px;
+    background: rgba(255,255,255,0.05);
+    overflow: hidden; margin-bottom: 6px;
+}
+.confidence-bar-fill {
+    height: 100%; border-radius: 2px;
+    transition: width 600ms var(--ease-smooth, cubic-bezier(0.25,0.1,0.25,1));
+}
+.confidence-meta {
+    font-size: 0.72rem; color: var(--text-muted, #5C6478);
+}
+.confidence-disclaimer {
+    font-style: italic; opacity: 0.8;
 }
 
 /* ── ONBOARDING ── */
@@ -1130,7 +1192,7 @@ if not st.session_state.messages:
 for i, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"]):
         if msg["role"] == "assistant" and msg.get("mode"):
-            badge_html = _render_mode_badge(msg["mode"], msg.get("confidence"))
+            badge_html = _render_mode_badge(msg["mode"], msg.get("confidence"), len(msg.get("sources", [])))
             if badge_html:
                 st.markdown(badge_html, unsafe_allow_html=True)
         st.markdown(msg["content"])
@@ -1188,7 +1250,7 @@ if question:
 
             # Confidence & badge
             confidence = best_score if mode == "code" else None
-            badge_html = _render_mode_badge(mode, confidence)
+            badge_html = _render_mode_badge(mode, confidence, len(sources))
             if badge_html:
                 st.markdown(badge_html, unsafe_allow_html=True)
 

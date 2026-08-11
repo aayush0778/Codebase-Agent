@@ -944,21 +944,47 @@ with st.sidebar:
     stats = st.session_state.get("index_stats") or get_index_stats()
     if stats:
         st.session_state["index_stats"] = stats
+
+        # Get code structure stats from cached repo tree
+        repo_root_dash = st.session_state.get("upload_path", DEFAULT_CODEBASE_PATH)
+        class_count = 0
+        func_count = 0
+        if os.path.isdir(repo_root_dash):
+            rd = get_cached_repo_tree(st.session_state, repo_root_dash)
+            for fpath in rd.get("flat_files", []):
+                fst = extract_file_structure(fpath)
+                class_count += len(fst.get("classes", []))
+                func_count += len(fst.get("functions", []))
+
         st.markdown(
             f'<div class="info-card">'
             f'<span class="label">Repository</span> <span class="accent">{stats.get("repo_name", "N/A")}</span><br>'
             f'<span class="label">Language</span> <span class="value">Python</span><br>'
             f'<span class="label">Indexed Files</span> <span class="value">{stats.get("files_indexed", "?")}</span><br>'
             f'<span class="label">Chunks</span> <span class="value">{stats.get("chunks_generated", "?")}</span><br>'
+            f'<span class="label">Classes</span> <span class="value">{class_count}</span><br>'
+            f'<span class="label">Functions</span> <span class="value">{func_count}</span><br>'
             f'<span class="label">Build Time</span> <span class="value">{stats.get("elapsed_seconds", 0):.1f}s</span><br>'
             f'<span class="label">Last Indexed</span> <span class="value">{stats.get("timestamp", "N/A")[:10]}</span>'
             f'</div>',
             unsafe_allow_html=True,
         )
+
+        # AI Insight actions (prefill only, never auto-invoke)
+        st.markdown("<h3>AI Insights</h3>", unsafe_allow_html=True)
+        insight_actions = [
+            ("\U0001f3d7\ufe0f Architecture", "Describe the high-level architecture and module structure of this codebase"),
+            ("\U0001f4ca Patterns", "What design patterns are used in this codebase? List them with examples"),
+            ("\U0001f527 Entry Points", "What are the main entry points and how does execution flow through this codebase?"),
+        ]
+        for label, prompt in insight_actions:
+            if st.button(label, key=f"insight_{label[2:6]}", use_container_width=True):
+                st.session_state["_pending_question"] = prompt
+                st.rerun()
     else:
         st.markdown(
             '<div class="info-card">'
-            '<span class="label">Repository</span> <span class="value" style="color:#71717A;">Not Indexed</span>'
+            '<span class="label">Repository</span> <span class="value" style="color:var(--text-muted);">Not Indexed</span>'
             '</div>',
             unsafe_allow_html=True,
         )

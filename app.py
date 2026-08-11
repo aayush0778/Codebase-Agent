@@ -22,6 +22,7 @@ from ingestion.indexer import build_index
 from retrieval.query_engine import (
     load_query_engine, ask, get_index_stats, check_ollama_status,
 )
+from retrieval.repo_tree import get_cached_repo_tree, extract_file_structure
 from config import (
     DEFAULT_CODEBASE_PATH, LLM_MODEL, TOP_K, EMBEDDING_MODEL,
     DATA_DIR, RELEVANCE_THRESHOLD,
@@ -1123,6 +1124,67 @@ with st.sidebar:
             )
     else:
         st.caption("Chat is empty.")
+
+    # ── Architecture Explorer ──
+    st.markdown("---")
+    st.markdown("<h3>Architecture</h3>", unsafe_allow_html=True)
+    repo_root = st.session_state.get("upload_path", DEFAULT_CODEBASE_PATH)
+    if os.path.isdir(repo_root):
+        repo_data = get_cached_repo_tree(st.session_state, repo_root)
+        tree_stats = repo_data.get("stats", {})
+        if tree_stats:
+            st.markdown(
+                f'<div class="info-card">'
+                f'<span class="label">Files</span> <span class="value">{tree_stats.get("total_files", 0)}</span><br>'
+                f'<span class="label">Python</span> <span class="value">{tree_stats.get("py_files", 0)}</span><br>'
+                f'<span class="label">Lines</span> <span class="value">{tree_stats.get("total_loc", 0):,}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+        # File tree in expander
+        with st.expander("📁 File Explorer", expanded=False):
+            tree = repo_data.get("tree", {})
+            if tree:
+                def _render_tree(node, depth=0):
+                    """Recursively render the file tree."""
+                    for name in sorted(node.keys()):
+                        info = node[name]
+                        indent = "\u2003" * depth
+                        if info.get("is_dir"):
+                            st.markdown(f"{indent}📁 **{name}/**", unsafe_allow_html=True)
+                            if info.get("children"):
+                                _render_tree(info["children"], depth + 1)
+                        else:
+                            icon = "🐍" if name.endswith(".py") else "📄"
+                            st.markdown(f"{indent}{icon} `{name}`", unsafe_allow_html=True)
+                _render_tree(tree)
+            else:
+                st.caption("No files found.")
+
+        # Code structure for .py files
+        flat_files = repo_data.get("flat_files", [])
+        if flat_files:
+            with st.expander(f"🔍 Code Structure ({len(flat_files)} files)", expanded=False):
+                for fpath in flat_files[:30]:  # Cap to avoid UI overload
+                    fname = os.path.basename(fpath)
+                    structure = extract_file_structure(fpath)
+                    classes = structure.get("classes", [])
+                    functions = structure.get("functions", [])
+                    loc = structure.get("loc", 0)
+                    summary = f"{len(classes)}C {len(functions)}F {loc}L"
+                    st.markdown(f"🐍 **{fname}** <span style='color:var(--text-muted);font-size:0.78em;'>{summary}</span>", unsafe_allow_html=True)
+                    for cls in classes:
+                        methods_str = ", ".join(cls["methods"][:5])
+                        if len(cls["methods"]) > 5:
+                            methods_str += f" +{len(cls['methods'])-5}"
+                        st.markdown(f"\u2003🏛️ `{cls['name']}` L{cls['line']} → {methods_str}", unsafe_allow_html=True)
+                    for fn in functions:
+                        st.markdown(f"\u2003ƒ `{fn['name']}` L{fn['line']}", unsafe_allow_html=True)
+                if len(flat_files) > 30:
+                    st.caption(f"+ {len(flat_files) - 30} more files...")
+    else:
+        st.caption("Index a repository to explore its architecture.")
 
     # ── About Panel ──
     st.markdown("---")

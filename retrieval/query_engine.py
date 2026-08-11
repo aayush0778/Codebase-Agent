@@ -146,6 +146,41 @@ def _answer_says_not_found(answer_text):
     return any(phrase in lower for phrase in NOT_FOUND_PHRASES)
 
 
+def _estimate_tokens(text):
+    """Rough token estimation: ~4 chars per token for English/code."""
+    return len(text) // 4
+
+
+def _truncate_to_budget(history_text, question, style_modifier, max_tokens):
+    """Truncate history to fit within the token budget.
+
+    Trims history first (removes oldest turns), preserving the question and
+    style modifier. Returns (truncated_history, was_truncated).
+    """
+    question_tokens = _estimate_tokens(question)
+    style_tokens = _estimate_tokens(style_modifier)
+    # Reserve ~30% of window for the response and RAG context
+    available = int(max_tokens * 0.7) - question_tokens - style_tokens
+
+    if available <= 0:
+        return "", True
+
+    history_tokens = _estimate_tokens(history_text)
+    if history_tokens <= available:
+        return history_text, False
+
+    # Truncate history by removing oldest turns
+    lines = history_text.split("\n")
+    while lines and _estimate_tokens("\n".join(lines)) > available:
+        # Remove 2 lines (one User + one Assistant turn)
+        if len(lines) >= 2:
+            lines = lines[2:]
+        else:
+            lines = []
+    truncated = "\n".join(lines)
+    return truncated, True
+
+
 # ──────────────────────────────────────────────
 # General-knowledge fallback (direct LLM call)
 # ──────────────────────────────────────────────
@@ -218,6 +253,17 @@ def ask(query_engine, question, history=None, progress_fn=None, style_profile=No
         style_modifier = STYLE_PROFILES[style_key].get("prompt_modifier", "")
 
     history_text = _format_history(history)
+
+    # Long-context handling: truncate if exceeding context window
+    context_truncated = False
+    if history_text:
+        history_text, context_truncated = _truncate_to_budget(
+            history_text, question, style_modifier, LLM_CONTEXT_WINDOW
+        )
+        if context_truncated:
+            _progress("Context trimmed to fit model window...")
+            logger.info("History truncated to fit context window")
+
     effective_query = f"{history_text}\nUser: {question}" if history_text else question
     if style_modifier:
         effective_query = f"[Style: {style_key}]{style_modifier}\n\n{effective_query}"
@@ -269,7 +315,7 @@ def ask(query_engine, question, history=None, progress_fn=None, style_profile=No
     _log_query(question, answer_text, sources, mode, best_score)
 
     logger.info("Answer generated in '%s' mode with %d source(s).", mode, len(sources))
-    return answer_text, sources, mode, best_score
+    return answer_text, sources, mode, best_score, context_truncated
 
 
 def _extract_sources(response):

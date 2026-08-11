@@ -1322,6 +1322,14 @@ for i, msg in enumerate(st.session_state.messages):
         st.markdown(msg["content"])
         if msg["role"] == "assistant":
             _render_sources(msg.get("sources", []), msg.get("mode", ""))
+            if msg.get("context_truncated"):
+                st.markdown(
+                    '<div class="general-note">'
+                    '\u26a0\ufe0f <strong>Context Trimmed</strong> \u2014 '
+                    'History was truncated for this response.'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
             # Find the user question that preceded this response
             user_q = ""
             if i > 0 and st.session_state.messages[i-1]["role"] == "user":
@@ -1358,7 +1366,7 @@ if question:
 
                 try:
                     on_progress("Reading question...")
-                    answer, sources, mode, best_score = ask(
+                    answer, sources, mode, best_score, ctx_truncated = ask(
                         st.session_state.engine,
                         question,
                         history=history_for_ask,
@@ -1371,6 +1379,7 @@ if question:
                     sources = []
                     mode = "error"
                     best_score = 0.0
+                    ctx_truncated = False
                     status.update(label="Error", state="error", expanded=False)
 
             # Confidence & badge
@@ -1381,6 +1390,15 @@ if question:
 
             st.markdown(answer)
             _render_sources(sources, mode)
+            if ctx_truncated:
+                st.markdown(
+                    '<div class="general-note">'
+                    '\u26a0\ufe0f <strong>Context Trimmed</strong> — '
+                    'Conversation history was truncated to fit the model context window. '
+                    'Start a new chat for full context.'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
             _render_response_actions(len(st.session_state.messages), question[:60])
 
         # Save to history
@@ -1390,6 +1408,7 @@ if question:
             "sources": sources,
             "mode": mode,
             "confidence": confidence,
+            "context_truncated": ctx_truncated,
         })
         _save_chat(st.session_state.chat_id, st.session_state.messages)
 

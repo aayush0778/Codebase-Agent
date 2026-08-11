@@ -156,3 +156,53 @@ def get_cached_repo_tree(session_state, root_path):
     data = build_repo_tree(root_path)
     session_state["_repo_tree_cache"] = {"root": str(root_path), "data": data}
     return data
+
+
+def extract_dependencies(flat_files):
+    """Extract and classify all dependencies from a list of Python files.
+
+    Returns:
+        A dict with keys:
+          - third_party: sorted list of third-party package names
+          - local: sorted list of local module imports
+          - stdlib: sorted list of stdlib imports
+    """
+    import sys
+    stdlib_modules = set(sys.stdlib_module_names) if hasattr(sys, 'stdlib_module_names') else set()
+
+    all_imports = set()
+    for fpath in flat_files:
+        structure = extract_file_structure(fpath)
+        for imp in structure.get("imports", []):
+            # Get the top-level package name
+            top = imp.split(".")[0]
+            if top:
+                all_imports.add(top)
+
+    third_party = set()
+    local = set()
+    stdlib = set()
+
+    # Get local module names from filenames
+    local_names = set()
+    for fpath in flat_files:
+        name = os.path.splitext(os.path.basename(fpath))[0]
+        local_names.add(name)
+        # Also add parent directory names as potential local packages
+        parent = os.path.basename(os.path.dirname(fpath))
+        if parent and parent != ".":
+            local_names.add(parent)
+
+    for imp in all_imports:
+        if imp in local_names:
+            local.add(imp)
+        elif stdlib_modules and imp in stdlib_modules:
+            stdlib.add(imp)
+        else:
+            third_party.add(imp)
+
+    return {
+        "third_party": sorted(third_party),
+        "local": sorted(local),
+        "stdlib": sorted(stdlib),
+    }

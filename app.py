@@ -22,7 +22,7 @@ from ingestion.indexer import build_index
 from retrieval.query_engine import (
     load_query_engine, ask, get_index_stats, check_ollama_status,
 )
-from retrieval.repo_tree import get_cached_repo_tree, extract_file_structure
+from retrieval.repo_tree import get_cached_repo_tree, extract_file_structure, extract_dependencies
 from config import (
     DEFAULT_CODEBASE_PATH, LLM_MODEL, TOP_K, EMBEDDING_MODEL,
     DATA_DIR, RELEVANCE_THRESHOLD,
@@ -1209,6 +1209,25 @@ with st.sidebar:
                         st.markdown(f"\u2003ƒ `{fn['name']}` L{fn['line']}", unsafe_allow_html=True)
                 if len(flat_files) > 30:
                     st.caption(f"+ {len(flat_files) - 30} more files...")
+
+            # Dependencies analysis
+            if flat_files:
+                with st.expander(f"📦 Dependencies", expanded=False):
+                    deps = extract_dependencies(flat_files)
+                    if deps.get("third_party"):
+                        st.markdown("**Third-Party**")
+                        for pkg in deps["third_party"]:
+                            st.markdown(f"\u2003📦 `{pkg}`")
+                    if deps.get("local"):
+                        st.markdown("**Local Modules**")
+                        for mod in deps["local"]:
+                            st.markdown(f"\u2003🏠 `{mod}`")
+                    if deps.get("stdlib"):
+                        st.markdown("**Standard Library**")
+                        for mod in deps["stdlib"]:
+                            st.markdown(f"\u2003⚡ `{mod}`")
+                    if not any(deps.values()):
+                        st.caption("No imports detected.")
     else:
         st.caption("Index a repository to explore its architecture.")
 

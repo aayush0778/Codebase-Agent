@@ -1250,6 +1250,14 @@ with st.sidebar:
             unsafe_allow_html=True
         )
 
+    # ── Creator Credit ──
+    st.markdown(
+        '<div style="text-align:center; padding:16px 0 8px; opacity:0.45; font-size:0.72rem; color:var(--text-muted, #5C6478);">'
+        'Made with \u2764\ufe0f by <strong>Aayush Singh</strong>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
 # ──────────────────────────────────────────────
 # Session state init
 # ──────────────────────────────────────────────

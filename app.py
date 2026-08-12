@@ -23,6 +23,7 @@ from retrieval.query_engine import (
     load_query_engine, ask, get_index_stats, check_ollama_status,
 )
 from retrieval.repo_tree import get_cached_repo_tree, extract_file_structure, extract_dependencies
+from retrieval.background_tasks import BackgroundTaskManager
 from config import (
     DEFAULT_CODEBASE_PATH, LLM_MODEL, TOP_K, EMBEDDING_MODEL,
     DATA_DIR, RELEVANCE_THRESHOLD,
@@ -1311,6 +1312,24 @@ if not st.session_state.messages:
                     st.rerun()
 
 # ──────────────────────────────────────────────
+# Check for completed background generation results
+# ──────────────────────────────────────────────
+_bg_manager = BackgroundTaskManager.get_instance()
+_bg_result = _bg_manager.consume_result(st.session_state.chat_id)
+if _bg_result:
+    # A background generation completed — append to messages
+    _bg_confidence = _bg_result["best_score"] if _bg_result["mode"] == "code" else None
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": _bg_result["answer"],
+        "sources": _bg_result.get("sources", []),
+        "mode": _bg_result["mode"],
+        "confidence": _bg_confidence,
+        "context_truncated": _bg_result.get("context_truncated", False),
+    })
+    _save_chat(st.session_state.chat_id, st.session_state.messages)
+
+# ──────────────────────────────────────────────
 # Chat history display
 # ──────────────────────────────────────────────
 for i, msg in enumerate(st.session_state.messages):
@@ -1335,6 +1354,21 @@ for i, msg in enumerate(st.session_state.messages):
             if i > 0 and st.session_state.messages[i-1]["role"] == "user":
                 user_q = st.session_state.messages[i-1]["content"][:60]
             _render_response_actions(i, user_q)
+
+# ──────────────────────────────────────────────
+# Background generation progress indicator
+# ──────────────────────────────────────────────
+if _bg_manager.is_generating(st.session_state.chat_id):
+    _bg_progress = _bg_manager.get_progress(st.session_state.chat_id)
+    st.markdown(
+        f'<div class="general-note">'
+        f'\u23f3 <strong>Generating in background...</strong> {_bg_progress}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+    # Auto-refresh to pick up completed results
+    time.sleep(2)
+    st.rerun()
 
 # ──────────────────────────────────────────────
 # Chat input with thinking steps + streaming

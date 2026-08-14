@@ -250,21 +250,22 @@ CodebookLM/
 │   └── uploads/                  # Uploaded repositories
 │
 └── assets/                       # Screenshots & media
-    ├── screenshot1.png
-    └── screenshot2.png
+    ├── logo.png
+    ├── codebooklm_dashboard.png
+    └── codebooklm_retrieval.png
 ```
 
 ---
 
 ## 📸 Screenshots
 
-### Main Dashboard & Chat Interface
-![CodebookLM Dashboard](assets/screenshot1.png)
-*Premium local-first interface with glassmorphism, system diagnostics, and repository dashboard.*
+### Main Dashboard & Query Processing
+![CodebookLM Dashboard](assets/codebooklm_dashboard.png)
+*Obsidian-dark interface with reasoning steps, system diagnostics, and real-time repository metrics.*
 
-### Retrieval in Action
-![CodebookLM Query Response](assets/screenshot2.png)
-*Detailed responses with confidence indicators, source attribution, and AI insight actions.*
+### Grounded Retrieval in Action
+![CodebookLM Query Response](assets/codebooklm_retrieval.png)
+*Code review style response with 94% confidence grounding, formatted code blocks, and conversation manager.*
 
 ---
 

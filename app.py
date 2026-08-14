@@ -244,7 +244,7 @@ def _render_mode_badge(mode, confidence=None, num_sources=0):
             conf_html = (
                 f'<div class="confidence-panel">'
                 f'<div class="confidence-header">'
-                f'<span class="mode-badge mode-code">&#x1F7E2; Codebase</span>'
+                f'<span class="mode-badge mode-code">● Codebase</span>'
                 f'<span class="confidence-label">{level} Relevance · {pct}%</span>'
                 f'</div>'
                 f'<div class="confidence-bar-track">'
@@ -260,12 +260,12 @@ def _render_mode_badge(mode, confidence=None, num_sources=0):
         else:
             return (
                 f'<span class="mode-badge mode-code">'
-                f'&#x1F7E2; Codebase</span>'
+                f'● Codebase</span>'
             )
     elif mode == "general":
         return (
             '<span class="mode-badge mode-general">'
-            '&#x1F30D; General Knowledge</span>'
+            '● General Knowledge</span>'
         )
     return ""
 
@@ -273,7 +273,7 @@ def _render_mode_badge(mode, confidence=None, num_sources=0):
 def _render_sources(sources, mode):
     """Render source attribution section."""
     if mode == "code" and sources:
-        with st.expander(f"📄 Sources ({len(sources)} files)", expanded=False):
+        with st.expander(f"Sources ({len(sources)} files)", expanded=False):
             for s in sources:
                 score_text = f" — score: {s['score']}" if s.get("score") else ""
                 st.markdown(
@@ -283,7 +283,7 @@ def _render_sources(sources, mode):
     elif mode == "general":
         st.markdown(
             '<div class="general-note">'
-            '🌍 <strong>General Knowledge</strong> — '
+            '<strong>General Knowledge</strong> — '
             'No relevant code was found in the indexed repository. '
             'Response generated using the LLM\'s general knowledge.'
             '</div>',
@@ -296,9 +296,9 @@ def _render_response_actions(msg_index, first_user_msg=""):
     Actions prefill the chat input via session_state (never auto-invoke).
     """
     actions = [
-        ("💡 Explain more", f"Explain this in more detail: {first_user_msg}"),
-        ("📝 Show examples", f"Show code examples for: {first_user_msg}"),
-        ("🔗 Related code", f"What related code is connected to: {first_user_msg}"),
+        ("Explain more", f"Explain this in more detail: {first_user_msg}"),
+        ("Show examples", f"Show code examples for: {first_user_msg}"),
+        ("Related code", f"What related code is connected to: {first_user_msg}"),
     ]
     cols = st.columns(len(actions))
     for col, (label, prompt) in zip(cols, actions):
@@ -337,6 +337,26 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
+
+:root {
+    color-scheme: dark !important;
+}
+
+html, body {
+    background-color: #050507 !important;
+}
+
+header[data-testid="stHeader"],
+div[data-testid="stAppHeader"],
+div[data-testid="stBottomBlockContainer"],
+div[data-testid="stBottomBlockContainer"] > div,
+div[data-testid="stChatInputContainer"],
+div[data-testid="stChatFloatingInputContainer"],
+.stChatFloatingInputContainer,
+footer {
+    background-color: transparent !important;
+    background: transparent !important;
+}
 :root {
     --bg-base: #050507;
     --bg-surface: #0A0B0F;
@@ -845,11 +865,35 @@ p.hero-desc {
 /* ═══════ FILE UPLOADER ═══════ */
 [data-testid="stFileUploader"] {
     border-radius: var(--radius-sm) !important;
-    border: 1px dashed rgba(52,211,153,0.15) !important;
     background: transparent !important;
-    transition: border-color 200ms var(--ease-smooth) !important;
 }
-[data-testid="stFileUploader"]:hover { border-color: rgba(52,211,153,0.3) !important; }
+[data-testid="stFileUploader"] section,
+[data-testid="stFileUploaderDropzone"],
+[data-testid="stFileUploader"] > div,
+[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] {
+    background: rgba(255, 255, 255, 0.02) !important;
+    border: 1px dashed rgba(52, 211, 153, 0.2) !important;
+    border-radius: 8px !important;
+    transition: all 200ms var(--ease-smooth) !important;
+}
+[data-testid="stFileUploader"] section:hover,
+[data-testid="stFileUploaderDropzone"]:hover {
+    background: rgba(52, 211, 153, 0.04) !important;
+    border-color: rgba(52, 211, 153, 0.45) !important;
+}
+[data-testid="stFileUploader"] * {
+    color: #8B95A8 !important;
+}
+[data-testid="stFileUploader"] button {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    color: #EAEDF3 !important;
+}
+[data-testid="stFileUploader"] button:hover {
+    background: rgba(52, 211, 153, 0.08) !important;
+    border-color: rgba(52, 211, 153, 0.3) !important;
+    color: #34D399 !important;
+}
 
 /* ═══════ EXAMPLE QUESTIONS — Emerald interactive cards ═══════ */
 .example-btn button {

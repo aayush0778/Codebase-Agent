@@ -322,112 +322,312 @@ def _get_time_duration(start_iso):
 # ──────────────────────────────────────────────
 # Page config
 # ──────────────────────────────────────────────
+icon_path = "assets/logo.png" if os.path.exists("assets/logo.png") else None
 st.set_page_config(
-    page_title="📘 CodebookLM v1.0",
-    page_icon="📘",
+    page_title="CodebookLM v1.0 — Offline AI Codebase Assistant",
+    page_icon=icon_path if icon_path else "assets/logo.png",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # ──────────────────────────────────────────────
-# CSS: Premium desktop application aesthetic (Linear/Notion inspired)
+# CSS: Premium desktop application aesthetic — Black + Emerald
 # ──────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-    --bg-base: #0C0E14;
-    --bg-surface: #12141C;
-    --bg-sidebar: #101218;
-    --bg-card: #181B25;
-    --bg-elevated: #1E212D;
-    --bg-overlay: #222638;
-    --bg-input: #1A1D28;
-    --bg-hover: #222638;
+    --bg-base: #050507;
+    --bg-surface: #0A0B0F;
+    --bg-sidebar: #08090D;
+    --bg-card: #0F1014;
+    --bg-elevated: #141519;
+    --bg-overlay: #1A1B22;
+    --bg-input: #0D0E13;
+    --bg-hover: #16171E;
     --border: rgba(255, 255, 255, 0.06);
-    --border-subtle: rgba(255, 255, 255, 0.04);
-    --border-hover: rgba(255, 255, 255, 0.12);
-    --border-active: rgba(110, 231, 183, 0.25);
+    --border-subtle: rgba(255, 255, 255, 0.03);
+    --border-hover: rgba(52, 211, 153, 0.2);
+    --border-active: rgba(52, 211, 153, 0.35);
     --accent: #34D399;
+    --accent-bright: #5EEAD4;
     --accent-secondary: #6EE7B7;
-    --accent-dim: rgba(52, 211, 153, 0.08);
+    --accent-dim: rgba(52, 211, 153, 0.07);
+    --accent-glow: rgba(52, 211, 153, 0.12);
     --accent-border: rgba(52, 211, 153, 0.18);
     --cyan: #67E8F9;
     --cyan-dim: rgba(103, 232, 249, 0.06);
-    --text-primary: #EAEDF3;
+    --text-primary: #F0F2F5;
     --text-secondary: #8B95A8;
-    --text-muted: #5C6478;
+    --text-muted: #4E5668;
     --danger-dim: rgba(239, 68, 68, 0.08);
     --purple-dim: rgba(168, 85, 247, 0.08);
     --purple-text: #c4b5fd;
     --yellow-dim: rgba(234, 179, 8, 0.10);
     --yellow-text: #fde047;
-    --shadow-sm: 0 2px 8px rgba(0,0,0,0.2);
-    --shadow-card: 0 4px 20px rgba(0,0,0,0.3);
-    --shadow-lg: 0 8px 40px rgba(0,0,0,0.4);
+    --shadow-sm: 0 2px 8px rgba(0,0,0,0.35);
+    --shadow-card: 0 4px 24px rgba(0,0,0,0.5);
+    --shadow-lg: 0 8px 48px rgba(0,0,0,0.6);
+    --shadow-glow: 0 0 20px rgba(52,211,153,0.08);
     --glass: rgba(255, 255, 255, 0.02);
-    --glass-border: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.04);
     --radius: 12px;
     --radius-sm: 8px;
     --radius-xs: 6px;
     --ease-smooth: cubic-bezier(0.25, 0.1, 0.25, 1);
     --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
+/* ═══════ GLOBAL RESET ═══════ */
 html, body, [class*="css"] {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
     line-height: 1.6 !important;
 }
 
+/* Force true black background everywhere */
 .stApp {
     background: var(--bg-base) !important;
+    background-image: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(52,211,153,0.02) 0%, transparent 70%) !important;
     color: var(--text-primary) !important;
 }
-
 .stApp > header { background: transparent !important; }
 
+/* Main container */
 .stMainBlockContainer {
     max-width: 880px !important;
     padding: 2rem 1.5rem !important;
 }
 
-/* ── SIDEBAR ── */
-section[data-testid="stSidebar"] {
-    background: var(--bg-sidebar) !important;
-    border-right: 1px solid var(--border) !important;
-    backdrop-filter: blur(12px) !important;
-}
-section[data-testid="stSidebar"] * { color: var(--text-primary) !important; }
-section[data-testid="stSidebar"] h1 {
-    font-size: 1.15rem !important; font-weight: 600 !important;
-    letter-spacing: -0.01em !important; margin-bottom: 24px !important;
-    background: none !important; -webkit-text-fill-color: var(--text-primary) !important;
-}
-section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {
-    font-size: 0.72rem !important; text-transform: uppercase !important;
-    letter-spacing: 0.08em !important; color: var(--text-muted) !important;
-    margin-top: 24px !important; margin-bottom: 12px !important; font-weight: 600 !important;
-}
-section[data-testid="stSidebar"] code {
-    background: var(--accent-dim) !important; color: var(--accent) !important;
-    padding: 2px 7px !important; border-radius: 5px !important;
-    font-family: 'JetBrains Mono', monospace !important; font-size: 0.75rem !important;
-    border: 1px solid var(--accent-border) !important;
-}
-section[data-testid="stSidebar"] .stButton > button {
-    font-size: 0.8rem !important; padding: 0.4rem 0.8rem !important;
-    text-align: left !important; white-space: nowrap !important;
-    overflow: hidden !important; text-overflow: ellipsis !important;
-    border-radius: var(--radius-sm) !important;
+/* Force dark backgrounds on all Streamlit elements */
+div[data-testid="stAppViewBlockContainer"],
+div[data-testid="stVerticalBlock"],
+div[data-testid="stHorizontalBlock"],
+.main .block-container {
+    background: transparent !important;
 }
 
-/* ── TITLE ── */
+/* ═══════ SIDEBAR ═══════ */
+section[data-testid="stSidebar"] {
+    background: #08090D !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4) !important;
+}
+section[data-testid="stSidebar"] > div { 
+    background: #08090D !important;
+    padding-top: 1.2rem !important;
+}
+section[data-testid="stSidebar"] * { 
+    color: var(--text-primary) !important; 
+}
+
+/* Sidebar Brand Header */
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0 16px 0;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.brand-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.brand-gem {
+    width: 8px;
+    height: 8px;
+    background: #34D399;
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(52, 211, 153, 0.7);
+    display: inline-block;
+}
+.brand-title {
+    font-size: 1.05rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    color: #F0F2F5;
+}
+.brand-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #34D399;
+    background: rgba(52, 211, 153, 0.08);
+    border: 1px solid rgba(52, 211, 153, 0.2);
+    padding: 2px 7px;
+    border-radius: 12px;
+    letter-spacing: 0.02em;
+}
+
+/* Sidebar Section Headers */
+.sidebar-section-hdr {
+    font-size: 0.68rem !important;
+    font-weight: 650 !important;
+    letter-spacing: 0.09em !important;
+    text-transform: uppercase !important;
+    color: #5C6478 !important;
+    margin: 18px 0 8px 0 !important;
+    padding: 0 2px !important;
+}
+
+.sidebar-subhdr {
+    font-size: 0.68rem !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
+    color: #8B95A8 !important;
+    display: block;
+    margin: 8px 0 4px 0;
+}
+
+section[data-testid="stSidebar"] code {
+    background: rgba(52, 211, 153, 0.06) !important; 
+    color: #6EE7B7 !important;
+    padding: 2px 6px !important; 
+    border-radius: 4px !important;
+    font-family: 'JetBrains Mono', monospace !important; 
+    font-size: 0.75rem !important;
+    border: 1px solid rgba(52, 211, 153, 0.15) !important;
+}
+
+/* Sidebar Buttons — Sleek dark card interaction */
+section[data-testid="stSidebar"] .stButton > button {
+    font-size: 0.78rem !important; 
+    font-weight: 500 !important;
+    padding: 0.42rem 0.75rem !important;
+    text-align: left !important; 
+    white-space: nowrap !important;
+    overflow: hidden !important; 
+    text-overflow: ellipsis !important;
+    border-radius: 6px !important;
+    background: rgba(255, 255, 255, 0.025) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25) !important;
+    color: #8B95A8 !important;
+    transition: all 200ms cubic-bezier(0.25, 0.1, 0.25, 1) !important;
+}
+
+section[data-testid="stSidebar"] .stButton > button:hover {
+    background: rgba(52, 211, 153, 0.05) !important;
+    border-color: rgba(52, 211, 153, 0.25) !important; 
+    color: #F0F2F5 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35), 0 0 12px rgba(52, 211, 153, 0.05) !important;
+}
+
+section[data-testid="stSidebar"] .stButton > button:active {
+    transform: scale(0.97) translateY(0) !important;
+    transition-duration: 80ms !important;
+}
+
+/* Tree & Code Structure items */
+.tree-dir {
+    color: #67E8F9 !important;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.76rem;
+    font-weight: 600;
+}
+.tree-file {
+    color: #D1D5DB !important;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.76rem;
+}
+.tree-hdr {
+    color: #F0F2F5;
+    font-size: 0.8rem;
+}
+.tree-summary {
+    color: #5C6478;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    margin-left: 4px;
+}
+.tree-loc {
+    color: #5C6478;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+}
+.tree-methods {
+    color: #8B95A8;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+}
+
+.tag-class, .tag-func, .tag-pkg, .tag-local, .tag-std {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 1px 5px;
+    border-radius: 4px;
+    margin-right: 4px;
+    display: inline-block;
+}
+.tag-class {
+    background: rgba(168, 85, 247, 0.1);
+    color: #C4B5FD;
+    border: 1px solid rgba(168, 85, 247, 0.2);
+}
+.tag-func {
+    background: rgba(52, 211, 153, 0.08);
+    color: #6EE7B7;
+    border: 1px solid rgba(52, 211, 153, 0.2);
+}
+.tag-pkg {
+    background: rgba(103, 232, 249, 0.08);
+    color: #67E8F9;
+    border: 1px solid rgba(103, 232, 249, 0.2);
+}
+.tag-local {
+    background: rgba(234, 179, 8, 0.08);
+    color: #FDE047;
+    border: 1px solid rgba(234, 179, 8, 0.2);
+}
+.tag-std {
+    background: rgba(255, 255, 255, 0.04);
+    color: #8B95A8;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Sidebar Creator Credit */
+.sidebar-credit {
+    text-align: center;
+    padding: 20px 0 8px 0;
+    font-size: 0.72rem;
+    color: #4E5668;
+    letter-spacing: 0.02em;
+    border-top: 1px solid rgba(255, 255, 255, 0.03);
+    margin-top: 24px;
+}
+.sidebar-credit strong {
+    color: #8B95A8;
+    font-weight: 500;
+}
+
+/* ═══════ TITLE ═══════ */
 h1 {
     color: var(--text-primary) !important;
     font-weight: 600 !important;
-    letter-spacing: -0.02em !important; 
+    letter-spacing: -0.02em !important;
 }
+
+.hero-version {
+    font-size: 1.05rem !important;
+    font-weight: 600 !important;
+    color: #34D399 !important;
+    background: rgba(52, 211, 153, 0.08) !important;
+    border: 1px solid rgba(52, 211, 153, 0.2) !important;
+    padding: 3px 10px !important;
+    border-radius: 12px !important;
+    vertical-align: middle !important;
+    letter-spacing: 0.02em !important;
+    display: inline-block !important;
+    margin-left: 6px !important;
+}
+
 h1.hero-title {
     font-size: 2.4rem !important; margin-bottom: 4px !important;
 }
@@ -439,17 +639,21 @@ p.hero-desc {
     font-size: 0.95rem !important; color: var(--text-muted) !important;
 }
 
-/* ── STATUS BADGES ── */
+/* ═══════ STATUS BADGES ═══════ */
 .status-badge {
     display: inline-flex; align-items: center; gap: 8px;
     padding: 6px 14px; border-radius: 6px; font-size: 0.8em;
     font-weight: 500; font-family: 'Inter', sans-serif; border: 1px solid;
     margin-bottom: 20px;
 }
-.status-ready { background: var(--accent-dim); color: var(--accent-secondary); border-color: var(--accent-border); }
+.status-ready {
+    background: var(--accent-dim); color: var(--accent-secondary);
+    border-color: var(--accent-border);
+    box-shadow: 0 0 12px rgba(52,211,153,0.06);
+}
 .status-none { background: var(--danger-dim); color: #fca5a5; border-color: rgba(239,68,68,0.15); }
 
-/* ── MODE BADGES ── */
+/* ═══════ MODE BADGES ═══════ */
 .mode-badge {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 4px 10px; border-radius: 6px; font-size: 0.72em;
@@ -460,176 +664,259 @@ p.hero-desc {
 .mode-general { background: var(--purple-dim); color: var(--purple-text); border-color: rgba(168,85,247,0.15); }
 .mode-mixed { background: var(--yellow-dim); color: var(--yellow-text); border-color: rgba(234,179,8,0.15); }
 
-/* ── GENERAL NOTE ── */
+/* ═══════ GENERAL NOTE ═══════ */
 .general-note {
     background: rgba(168, 85, 247, 0.04); border: 1px solid rgba(168,85,247,0.1);
     border-radius: var(--radius-sm); padding: 12px 16px; margin-top: 12px;
     font-size: 0.85em; color: var(--text-secondary);
 }
 
-/* ── INFO CARD (sidebar) ── */
+/* ═══════ INFO CARD (sidebar) ═══════ */
 .info-card {
-    background: var(--bg-sidebar); border: 1px solid var(--border);
-    border-radius: var(--radius-sm); padding: 16px; margin: 8px 0;
-    font-size: 0.82em; line-height: 1.8;
+    background: rgba(255, 255, 255, 0.018) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    border-radius: 8px !important;
+    padding: 12px 14px !important;
+    margin: 8px 0 !important;
+    font-size: 0.8rem !important;
+    line-height: 1.75 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+    transition: border-color 200ms ease, box-shadow 200ms ease !important;
 }
-.info-card .label { color: var(--text-muted); display: inline-block; width: 110px; }
-.info-card .value { color: var(--text-primary); font-weight: 500; }
-.info-card .accent { color: var(--text-primary); font-weight: 600; font-size: 0.9em; }
-.info-card .dot-ok { color: var(--accent); margin-right: 4px; }
-.info-card .dot-err { color: #ef4444; margin-right: 4px; }
+.info-card:hover {
+    border-color: rgba(52, 211, 153, 0.15) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), 0 0 12px rgba(52, 211, 153, 0.03) !important;
+}
+.info-card .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 0;
+}
+.info-card .label { 
+    color: #5C6478; 
+    font-size: 0.78rem; 
+}
+.info-card .value { 
+    color: #EAEDF3; 
+    font-weight: 500; 
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+}
+.info-card .accent { 
+    color: #34D399; 
+    font-weight: 600; 
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem; 
+}
+.info-card .dot-ok { 
+    color: #34D399; 
+    text-shadow: 0 0 8px rgba(52, 211, 153, 0.6); 
+    font-size: 0.65rem;
+    vertical-align: middle;
+    margin-right: 4px;
+}
+.info-card .dot-err { 
+    color: #EF4444; 
+    text-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+    font-size: 0.65rem;
+    vertical-align: middle;
+    margin-right: 4px;
+}
 
-/* ── CHAT MESSAGES ── */
+/* ═══════ CHAT MESSAGES ═══════ */
 [data-testid="stChatMessage"] {
-    background: var(--bg-base) !important; border: 1px solid transparent !important;
+    background: transparent !important; border: 1px solid transparent !important;
     border-radius: 0 !important; padding: 16px 8px !important;
-    margin-bottom: 8px !important; box-shadow: none !important;
-    color: var(--text-primary) !important; border-bottom: 1px solid var(--border) !important;
+    margin-bottom: 4px !important; box-shadow: none !important;
+    color: var(--text-primary) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.03) !important;
     animation: msgRiseIn 350ms var(--ease-smooth) both;
 }
 [data-testid="stChatMessage"] * { color: var(--text-primary) !important; }
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) { 
-    background: rgba(255,255,255,0.015) !important; 
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
+    background: rgba(255,255,255,0.01) !important;
 }
 [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) {
-    border-left: 2px solid rgba(52,211,153,0.15) !important;
-    transition: border-color 200ms var(--ease-smooth) !important;
+    border-left: 2px solid rgba(52,211,153,0.12) !important;
+    transition: border-color 250ms var(--ease-smooth) !important;
 }
 [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]):hover {
-    border-left-color: rgba(52,211,153,0.35) !important;
+    border-left-color: rgba(52,211,153,0.4) !important;
 }
 @keyframes msgRiseIn {
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── CODE BLOCKS ── */
+/* ═══════ CODE BLOCKS ═══════ */
 [data-testid="stChatMessage"] pre {
     background: var(--bg-card) !important; border: 1px solid var(--border) !important;
     border-radius: var(--radius-sm) !important; padding: 14px 18px !important;
     font-family: 'JetBrains Mono', monospace !important; font-size: 0.82rem !important;
     line-height: 1.6 !important; overflow-x: auto !important; margin: 12px 0 !important;
-    position: relative !important;
 }
 [data-testid="stChatMessage"] code {
     font-family: 'JetBrains Mono', monospace !important; font-size: 0.82rem !important;
 }
 [data-testid="stChatMessage"] p code {
-    background: rgba(255,255,255,0.06) !important; padding: 2px 6px !important;
-    border-radius: 4px !important; border: 1px solid transparent !important;
+    background: rgba(52,211,153,0.06) !important; padding: 2px 6px !important;
+    border-radius: 4px !important; border: 1px solid rgba(52,211,153,0.1) !important;
+    color: var(--accent-secondary) !important;
 }
 
-/* ── CHAT INPUT ── */
+/* ═══════ CHAT INPUT ═══════ */
 [data-testid="stChatInput"] { border-radius: var(--radius) !important; overflow: hidden; }
 [data-testid="stChatInput"] textarea {
-    background: var(--bg-input) !important; border: 1px solid rgba(255,255,255,0.08) !important;
+    background: var(--bg-input) !important; border: 1px solid rgba(255,255,255,0.06) !important;
     border-radius: var(--radius) !important; color: var(--text-primary) !important;
     font-family: 'Inter', sans-serif !important; padding: 14px 18px !important;
     font-size: 0.95rem !important; line-height: 1.5 !important;
-    transition: border-color 0.2s ease !important;
+    transition: all 0.3s var(--ease-smooth) !important;
 }
-[data-testid="stChatInput"] textarea:hover { border-color: rgba(255,255,255,0.12) !important; }
-[data-testid="stChatInput"] textarea:focus { border-color: var(--text-secondary) !important; box-shadow: none !important; outline: none !important; }
+[data-testid="stChatInput"] textarea:hover {
+    border-color: rgba(52,211,153,0.15) !important;
+}
+[data-testid="stChatInput"] textarea:focus {
+    border-color: rgba(52,211,153,0.3) !important;
+    box-shadow: 0 0 0 3px rgba(52,211,153,0.06), 0 0 20px rgba(52,211,153,0.04) !important;
+    outline: none !important;
+}
 [data-testid="stChatInput"] textarea::placeholder { color: var(--text-muted) !important; }
 
-/* ── BUTTONS ── */
+/* ═══════ BUTTONS — Premium with emerald glow ═══════ */
 .stButton > button {
-    background: rgba(255,255,255,0.04) !important; border: 1px solid var(--border) !important;
-    border-radius: var(--radius-sm) !important; color: var(--text-primary) !important;
+    background: rgba(255,255,255,0.03) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: var(--radius-sm) !important;
+    color: var(--text-primary) !important;
     font-weight: 500 !important; font-family: 'Inter', sans-serif !important;
-    padding: 0.45rem 1rem !important;
-    transition: all 200ms var(--ease-smooth) !important;
+    padding: 0.5rem 1.1rem !important;
+    transition: all 250ms var(--ease-smooth) !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+.stButton > button::before {
+    content: '' !important;
+    position: absolute !important; top: 0 !important; left: 0 !important;
+    width: 100% !important; height: 100% !important;
+    background: linear-gradient(135deg, rgba(52,211,153,0.08), rgba(94,234,212,0.04)) !important;
+    opacity: 0 !important;
+    transition: opacity 250ms var(--ease-smooth) !important;
 }
 .stButton > button:hover {
-    background: rgba(255,255,255,0.08) !important; border-color: var(--border-hover) !important;
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-sm);
+    border-color: rgba(52,211,153,0.25) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 20px rgba(52,211,153,0.06) !important;
+    color: var(--accent-secondary) !important;
 }
+.stButton > button:hover::before { opacity: 1 !important; }
 .stButton > button:active {
-    transform: scale(0.97) translateY(0) !important;
-    transition-duration: 80ms !important;
+    transform: scale(0.96) translateY(0) !important;
+    transition-duration: 100ms !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2) !important;
 }
 .stButton > button:focus-visible {
-    box-shadow: 0 0 0 2px var(--accent-dim), 0 0 0 4px rgba(52,211,153,0.1) !important;
+    box-shadow: 0 0 0 2px rgba(52,211,153,0.15), 0 0 0 4px rgba(52,211,153,0.06) !important;
     outline: none !important;
 }
 .stButton > button:disabled, .stButton > button[disabled] {
-    opacity: 0.35 !important; cursor: not-allowed !important;
+    opacity: 0.3 !important; cursor: not-allowed !important;
     pointer-events: none !important; transform: none !important;
 }
-section[data-testid="stSidebar"] .stButton > button {
-    background: transparent !important; border-color: transparent !important;
-    text-align: left !important; box-shadow: none !important;
-}
-section[data-testid="stSidebar"] .stButton > button:hover {
-    background: rgba(255,255,255,0.05) !important;
-    border-color: transparent !important; transform: none !important;
-    box-shadow: none !important;
-}
 
-/* ── EXPANDER ── */
+/* ═══════ EXPANDER ═══════ */
 [data-testid="stExpander"] {
     background: transparent !important; border: 1px solid var(--border) !important;
     border-radius: var(--radius-sm) !important; margin-top: 12px !important;
+    transition: border-color 200ms var(--ease-smooth) !important;
 }
-[data-testid="stExpander"] summary { color: var(--text-secondary) !important; font-weight: 500 !important; font-size: 0.85rem !important; }
+[data-testid="stExpander"]:hover { border-color: rgba(255,255,255,0.1) !important; }
+[data-testid="stExpander"] summary {
+    color: var(--text-secondary) !important; font-weight: 500 !important; font-size: 0.85rem !important;
+}
 
-/* ── STATUS CONTAINER ── */
+/* ═══════ STATUS CONTAINER ═══════ */
 [data-testid="stStatusWidget"] {
     background: var(--bg-card) !important; border: 1px solid var(--border) !important;
     border-radius: var(--radius-sm) !important;
 }
 
-/* ── FILE UPLOADER ── */
-[data-testid="stFileUploader"] { border-radius: var(--radius-sm) !important; border: 1px dashed var(--border) !important; background: transparent !important; }
+/* ═══════ FILE UPLOADER ═══════ */
+[data-testid="stFileUploader"] {
+    border-radius: var(--radius-sm) !important;
+    border: 1px dashed rgba(52,211,153,0.15) !important;
+    background: transparent !important;
+    transition: border-color 200ms var(--ease-smooth) !important;
+}
+[data-testid="stFileUploader"]:hover { border-color: rgba(52,211,153,0.3) !important; }
 
-/* ── EXAMPLE QUESTIONS ── */
+/* ═══════ EXAMPLE QUESTIONS — Emerald interactive cards ═══════ */
 .example-btn button {
-    background: var(--bg-card) !important; border: 1px solid var(--border) !important;
+    background: var(--bg-card) !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
     border-radius: var(--radius-sm) !important; font-size: 0.85rem !important;
-    padding: 10px 14px !important; text-align: left !important; color: var(--text-secondary) !important;
-    transition: all 200ms var(--ease-smooth) !important; width: 100% !important;
+    padding: 12px 16px !important; text-align: left !important;
+    color: var(--text-secondary) !important;
+    transition: all 280ms var(--ease-smooth) !important;
+    width: 100% !important; position: relative !important; overflow: hidden !important;
+}
+.example-btn button::after {
+    content: '→' !important; position: absolute !important;
+    right: 14px !important; top: 50% !important; transform: translateY(-50%) translateX(4px) !important;
+    opacity: 0 !important; color: var(--accent) !important;
+    transition: all 250ms var(--ease-smooth) !important;
+    font-size: 1em !important;
 }
 .example-btn button:hover {
-    border-color: var(--border-hover) !important; color: var(--text-primary) !important;
-    background: var(--bg-hover) !important; box-shadow: var(--shadow-sm) !important;
+    border-color: rgba(52,211,153,0.2) !important;
+    color: var(--text-primary) !important;
+    background: rgba(52,211,153,0.04) !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25), 0 0 24px rgba(52,211,153,0.04) !important;
+    transform: translateY(-2px) !important;
+    padding-right: 32px !important;
 }
+.example-btn button:hover::after { opacity: 1 !important; transform: translateY(-50%) translateX(0) !important; }
 .example-btn button:active {
-    transform: scale(0.98) !important; transition-duration: 80ms !important;
+    transform: scale(0.97) translateY(0) !important;
+    transition-duration: 100ms !important;
 }
 .example-btn button:focus-visible {
-    box-shadow: 0 0 0 2px var(--accent-dim) !important; outline: none !important;
+    box-shadow: 0 0 0 2px rgba(52,211,153,0.1) !important; outline: none !important;
 }
 
-/* ── RESPONSE ACTIONS ── */
+/* ═══════ RESPONSE ACTIONS ═══════ */
 .response-actions {
     display: flex; gap: 8px; margin-top: 12px; padding-top: 10px;
-    border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.04));
+    border-top: 1px solid rgba(255,255,255,0.03);
     flex-wrap: wrap;
 }
 .response-actions .action-btn button {
-    background: var(--glass, rgba(255,255,255,0.02)) !important;
-    border: 1px solid var(--border, rgba(255,255,255,0.06)) !important;
-    border-radius: 20px !important; padding: 4px 14px !important;
-    font-size: 0.76rem !important; color: var(--text-muted, #5C6478) !important;
-    font-weight: 500 !important; transition: all 200ms var(--ease-smooth) !important;
+    background: transparent !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+    border-radius: 20px !important; padding: 5px 14px !important;
+    font-size: 0.76rem !important; color: var(--text-muted) !important;
+    font-weight: 500 !important;
+    transition: all 250ms var(--ease-smooth) !important;
     white-space: nowrap !important;
 }
 .response-actions .action-btn button:hover {
     background: rgba(52,211,153,0.06) !important;
-    border-color: var(--accent-border, rgba(52,211,153,0.18)) !important;
-    color: var(--accent, #34D399) !important; transform: translateY(-1px) !important;
+    border-color: rgba(52,211,153,0.2) !important;
+    color: var(--accent) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
 }
 .response-actions .action-btn button:active {
-    transform: scale(0.97) !important; transition-duration: 80ms !important;
+    transform: scale(0.95) !important; transition-duration: 80ms !important;
 }
 
-/* ── CONFIDENCE INDICATOR ── */
+/* ═══════ CONFIDENCE INDICATOR ═══════ */
 .confidence-panel {
     padding: 10px 14px; margin-bottom: 10px;
-    background: var(--glass, rgba(255,255,255,0.02));
-    border: 1px solid var(--border-subtle, rgba(255,255,255,0.04));
-    border-radius: var(--radius-sm, 8px);
+    background: rgba(255,255,255,0.015);
+    border: 1px solid rgba(255,255,255,0.04);
+    border-radius: var(--radius-sm);
 }
 .confidence-header {
     display: flex; align-items: center; justify-content: space-between;
@@ -637,58 +924,133 @@ section[data-testid="stSidebar"] .stButton > button:hover {
 }
 .confidence-label {
     font-size: 0.78rem; font-weight: 500;
-    color: var(--text-secondary, #8B95A8);
+    color: var(--text-secondary);
 }
 .confidence-bar-track {
     width: 100%; height: 4px; border-radius: 2px;
-    background: rgba(255,255,255,0.05);
+    background: rgba(255,255,255,0.04);
     overflow: hidden; margin-bottom: 6px;
 }
 .confidence-bar-fill {
     height: 100%; border-radius: 2px;
-    transition: width 600ms var(--ease-smooth, cubic-bezier(0.25,0.1,0.25,1));
+    transition: width 600ms var(--ease-smooth);
 }
 .confidence-meta {
-    font-size: 0.72rem; color: var(--text-muted, #5C6478);
+    font-size: 0.72rem; color: var(--text-muted);
 }
 .confidence-disclaimer {
     font-style: italic; opacity: 0.8;
 }
 
-/* ── ONBOARDING ── */
+/* ═══════ ONBOARDING ═══════ */
 .onboarding {
     text-align: center; padding: 80px 20px; color: var(--text-secondary);
 }
-.onboarding h2 { color: var(--text-primary); font-size: 1.8rem; font-weight: 600; margin-bottom: 30px; letter-spacing: -0.01em; }
+.onboarding h2 {
+    color: var(--text-primary); font-size: 1.8rem; font-weight: 600;
+    margin-bottom: 30px; letter-spacing: -0.01em;
+}
 .onboarding .step-container { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .onboarding .step {
     display: flex; align-items: center; justify-content: flex-start;
     background: transparent; border: 1px solid var(--border);
     border-radius: var(--radius-sm); padding: 12px 20px; width: 280px;
     font-size: 0.9em; font-weight: 500; color: var(--text-primary);
-    transition: all 200ms var(--ease-smooth);
+    transition: all 250ms var(--ease-smooth);
 }
 .onboarding .step:hover {
-    border-color: var(--border-hover); transform: translateY(-2px);
-    box-shadow: var(--shadow-sm); background: var(--glass);
+    border-color: rgba(52,211,153,0.2); transform: translateY(-2px);
+    box-shadow: var(--shadow-card); background: rgba(52,211,153,0.02);
 }
-.onboarding .step span { color: var(--text-muted); font-family: 'JetBrains Mono', monospace; margin-right: 12px; font-size: 0.85em; }
+.onboarding .step span {
+    color: var(--accent); font-family: 'JetBrains Mono', monospace;
+    margin-right: 12px; font-size: 0.85em;
+}
 
-/* ── FOOTER ── */
+/* ═══════ FOOTER ═══════ */
 .footer {
     text-align: center; padding: 24px 0; margin-top: 60px;
-    border-top: 1px solid var(--border-subtle); color: var(--text-muted);
+    border-top: 1px solid rgba(255,255,255,0.03); color: var(--text-muted);
     font-size: 0.78em; letter-spacing: 0.02em; font-weight: 400;
-    opacity: 0.7;
+    opacity: 0.6;
 }
 
-/* ── SCROLLBAR ── */
-::-webkit-scrollbar { width: 5px; }
+/* ═══════ SCROLLBAR ═══════ */
+::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 6px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+::-webkit-scrollbar-thumb { background: rgba(52,211,153,0.12); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(52,211,153,0.25); }
 
-/* ── REDUCED MOTION ── */
+/* ═══════ SELECTBOX / DROPDOWN ═══════ */
+[data-testid="stSelectbox"] > div > div {
+    background: var(--bg-input) !important;
+    border-color: rgba(255,255,255,0.06) !important;
+    color: var(--text-primary) !important;
+}
+div[data-baseweb="select"] > div {
+    background: var(--bg-input) !important;
+    border-color: rgba(255,255,255,0.06) !important;
+}
+
+/* ═══════ TEXT INPUT ═══════ */
+input[type="text"], .stTextInput input {
+    background: var(--bg-input) !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+    color: var(--text-primary) !important;
+    border-radius: var(--radius-sm) !important;
+}
+input[type="text"]:focus, .stTextInput input:focus {
+    border-color: rgba(52,211,153,0.25) !important;
+    box-shadow: 0 0 0 2px rgba(52,211,153,0.06) !important;
+}
+
+/* ═══════ DOWNLOAD BUTTON ═══════ */
+.stDownloadButton > button {
+    background: rgba(52,211,153,0.06) !important;
+    border: 1px solid rgba(52,211,153,0.15) !important;
+    color: var(--accent-secondary) !important;
+}
+.stDownloadButton > button:hover {
+    background: rgba(52,211,153,0.12) !important;
+    border-color: rgba(52,211,153,0.3) !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 20px rgba(52,211,153,0.08) !important;
+    transform: translateY(-2px) !important;
+}
+.stDownloadButton > button:active {
+    transform: scale(0.96) !important;
+}
+
+/* ═══════ ALERT/SUCCESS/WARNING/ERROR ═══════ */
+[data-testid="stAlert"] {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-sm) !important;
+    color: var(--text-primary) !important;
+}
+
+/* ═══════ TABS (if any) ═══════ */
+.stTabs [data-baseweb="tab-list"] {
+    background: transparent !important;
+    border-bottom: 1px solid var(--border) !important;
+}
+.stTabs [data-baseweb="tab"] {
+    color: var(--text-muted) !important;
+    transition: color 200ms !important;
+}
+.stTabs [aria-selected="true"] {
+    color: var(--accent) !important;
+    border-bottom-color: var(--accent) !important;
+}
+
+/* ═══════ PROGRESS BAR ═══════ */
+.stProgress > div > div {
+    background: rgba(255,255,255,0.04) !important;
+}
+.stProgress > div > div > div {
+    background: linear-gradient(90deg, var(--accent), var(--accent-bright)) !important;
+}
+
+/* ═══════ REDUCED MOTION ═══════ */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.01ms !important;
@@ -697,16 +1059,16 @@ section[data-testid="stSidebar"] .stButton > button:hover {
     }
 }
 
-hr { border-color: var(--border) !important; margin: 1.5rem 0 !important; }
+hr { border-color: rgba(255,255,255,0.04) !important; margin: 1.5rem 0 !important; }
 .stCaption, [data-testid="stCaptionContainer"] { color: var(--text-muted) !important; font-size: 0.8rem !important; }
 [data-testid="stSpinner"] { color: var(--text-secondary) !important; }
 
-/* ── SPLASH SCREEN ── */
+/* ═══════ SPLASH SCREEN ═══════ */
 #cb-splash {
     position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
     z-index: 99999; display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    background: var(--bg-base, #0F1115);
+    background: #030305;
     animation: splashSequence 2.8s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
 }
 #cb-splash .splash-icon {
@@ -723,12 +1085,12 @@ hr { border-color: var(--border) !important; margin: 1.5rem 0 !important; }
 #cb-splash .splash-tagline {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     font-size: 0.88rem; font-weight: 400; letter-spacing: 0.01em;
-    color: #71717A; margin-top: 10px;
+    color: #4E5668; margin-top: 10px;
     opacity: 0; animation: splashFadeUp 550ms 480ms ease forwards;
 }
 #cb-splash .splash-divider {
     width: 52px; height: 1px;
-    background: rgba(255,255,255,0.08); margin-top: 28px;
+    background: rgba(52,211,153,0.15); margin-top: 28px;
     opacity: 0; animation: splashFadeUp 450ms 620ms ease forwards;
 }
 @keyframes splashSequence {
@@ -740,7 +1102,7 @@ hr { border-color: var(--border) !important; margin: 1.5rem 0 !important; }
 @keyframes splashGlow {
     0%   { transform: scale(0.90); filter: brightness(0.5); }
     14%  { transform: scale(1.0);  filter: brightness(1.0); }
-    28%  { transform: scale(1.04); filter: brightness(1.2) drop-shadow(0 0 24px rgba(34,197,94,0.3)); }
+    28%  { transform: scale(1.04); filter: brightness(1.2) drop-shadow(0 0 30px rgba(52,211,153,0.35)); }
     42%  { transform: scale(1.0);  filter: brightness(1.0) drop-shadow(0 0 0 transparent); }
     100% { transform: scale(1.0);  filter: brightness(1.0); }
 }
@@ -880,7 +1242,18 @@ components.html("""
 # Sidebar
 # ──────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("<h1>📘 CodebookLM v1.0</h1>", unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="sidebar-brand">
+            <div class="brand-title-wrap">
+                <span class="brand-gem"></span>
+                <span class="brand-title">CodebookLM</span>
+            </div>
+            <span class="brand-badge">v1.0</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # ── Upload ──
     uploaded_files = st.file_uploader(
@@ -939,8 +1312,7 @@ with st.sidebar:
                         st.error(f"Failed: {e}")
 
     # ── Repository Dashboard ──
-    st.markdown("---")
-    st.markdown("<h3>Repository Dashboard</h3>", unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-section-hdr">Repository Dashboard</div>', unsafe_allow_html=True)
     
     stats = st.session_state.get("index_stats") or get_index_stats()
     if stats:
@@ -959,40 +1331,39 @@ with st.sidebar:
 
         st.markdown(
             f'<div class="info-card">'
-            f'<span class="label">Repository</span> <span class="accent">{stats.get("repo_name", "N/A")}</span><br>'
-            f'<span class="label">Language</span> <span class="value">Python</span><br>'
-            f'<span class="label">Indexed Files</span> <span class="value">{stats.get("files_indexed", "?")}</span><br>'
-            f'<span class="label">Chunks</span> <span class="value">{stats.get("chunks_generated", "?")}</span><br>'
-            f'<span class="label">Classes</span> <span class="value">{class_count}</span><br>'
-            f'<span class="label">Functions</span> <span class="value">{func_count}</span><br>'
-            f'<span class="label">Build Time</span> <span class="value">{stats.get("elapsed_seconds", 0):.1f}s</span><br>'
-            f'<span class="label">Last Indexed</span> <span class="value">{stats.get("timestamp", "N/A")[:10]}</span>'
+            f'<div class="info-row"><span class="label">Repository</span> <span class="accent">{stats.get("repo_name", "N/A")}</span></div>'
+            f'<div class="info-row"><span class="label">Language</span> <span class="value">Python</span></div>'
+            f'<div class="info-row"><span class="label">Indexed Files</span> <span class="value">{stats.get("files_indexed", "?")}</span></div>'
+            f'<div class="info-row"><span class="label">Chunks</span> <span class="value">{stats.get("chunks_generated", "?")}</span></div>'
+            f'<div class="info-row"><span class="label">Classes</span> <span class="value">{class_count}</span></div>'
+            f'<div class="info-row"><span class="label">Functions</span> <span class="value">{func_count}</span></div>'
+            f'<div class="info-row"><span class="label">Build Time</span> <span class="value">{stats.get("elapsed_seconds", 0):.1f}s</span></div>'
+            f'<div class="info-row"><span class="label">Last Indexed</span> <span class="value">{stats.get("timestamp", "N/A")[:10]}</span></div>'
             f'</div>',
             unsafe_allow_html=True,
         )
 
         # AI Insight actions (prefill only, never auto-invoke)
-        st.markdown("<h3>AI Insights</h3>", unsafe_allow_html=True)
+        st.markdown('<div class="sidebar-section-hdr">AI Insights</div>', unsafe_allow_html=True)
         insight_actions = [
-            ("\U0001f3d7\ufe0f Architecture", "Describe the high-level architecture and module structure of this codebase"),
-            ("\U0001f4ca Patterns", "What design patterns are used in this codebase? List them with examples"),
-            ("\U0001f527 Entry Points", "What are the main entry points and how does execution flow through this codebase?"),
+            ("Architecture Overview", "Describe the high-level architecture and module structure of this codebase"),
+            ("Design Patterns", "What design patterns are used in this codebase? List them with examples"),
+            ("Execution & Entry Points", "What are the main entry points and how does execution flow through this codebase?"),
         ]
-        for label, prompt in insight_actions:
-            if st.button(label, key=f"insight_{label[2:6]}", use_container_width=True):
+        for idx, (label, prompt) in enumerate(insight_actions):
+            if st.button(label, key=f"insight_btn_{idx}", use_container_width=True):
                 st.session_state["_pending_question"] = prompt
                 st.rerun()
     else:
         st.markdown(
             '<div class="info-card">'
-            '<span class="label">Repository</span> <span class="value" style="color:var(--text-muted);">Not Indexed</span>'
+            '<div class="info-row"><span class="label">Repository</span> <span class="value" style="color:var(--text-muted);">Not Indexed</span></div>'
             '</div>',
             unsafe_allow_html=True,
         )
 
     # ── System Status ──
-    st.markdown("---")
-    st.markdown("<h3>System Status</h3>", unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-section-hdr">System Diagnostics</div>', unsafe_allow_html=True)
 
     gpu_info = _get_gpu_info()
     ollama_status = check_ollama_status()
@@ -1003,34 +1374,32 @@ with st.sidebar:
 
     st.markdown(
         f'<div class="info-card">'
-        f'<span class="label">Ollama</span> <span class="{ollama_dot}">●</span> <span class="value">{ollama_text}</span><br>'
-        f'<span class="label">LLM</span> <span class="value">`{LLM_MODEL}`</span><br>'
-        f'<span class="label">Embeddings</span> <span class="value">`{EMBEDDING_MODEL}`</span><br>'
-        f'<span class="label">GPU</span> <span class="{gpu_dot}">●</span> <span class="value">{gpu_label}</span><br>'
-        + (f'<span class="label">VRAM</span> <span class="value">{gpu_info["vram_free"]}</span><br>'
+        f'<div class="info-row"><span class="label">Ollama</span> <span class="value"><span class="{ollama_dot}">●</span> {ollama_text}</span></div>'
+        f'<div class="info-row"><span class="label">LLM</span> <span class="value"><code>{LLM_MODEL}</code></span></div>'
+        f'<div class="info-row"><span class="label">Embeddings</span> <span class="value"><code>{EMBEDDING_MODEL}</code></span></div>'
+        f'<div class="info-row"><span class="label">GPU</span> <span class="value"><span class="{gpu_dot}">●</span> {gpu_label}</span></div>'
+        + (f'<div class="info-row"><span class="label">VRAM</span> <span class="value">{gpu_info["vram_free"]}</span></div>'
            if gpu_info["available"] else '')
         + f'</div>',
         unsafe_allow_html=True,
     )
 
     # ── Session Information ──
-    st.markdown("---")
-    st.markdown("<h3>Session Information</h3>", unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-section-hdr">Session Metrics</div>', unsafe_allow_html=True)
     msg_count = len(st.session_state.get("messages", []))
     q_count = sum(1 for m in st.session_state.get("messages", []) if m["role"] == "user")
     session_start = st.session_state.get("session_start", datetime.now().isoformat())
     
     st.markdown(
         f'<div class="info-card">'
-        f'<span class="label">Questions</span> <span class="value">{q_count}</span><br>'
-        f'<span class="label">Duration</span> <span class="value">{_get_time_duration(session_start)}</span>'
+        f'<div class="info-row"><span class="label">Queries</span> <span class="value">{q_count}</span></div>'
+        f'<div class="info-row"><span class="label">Duration</span> <span class="value">{_get_time_duration(session_start)}</span></div>'
         f'</div>',
         unsafe_allow_html=True,
     )
 
     # ── Response Style ──
-    st.markdown("---")
-    st.markdown("<h3>Response Style</h3>", unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-section-hdr">Response Style</div>', unsafe_allow_html=True)
     style_keys = list(STYLE_PROFILES.keys())
     style_names = [STYLE_PROFILES[k]["name"] for k in style_keys]
     current_idx = style_keys.index(
@@ -1045,12 +1414,11 @@ with st.sidebar:
     st.caption(STYLE_PROFILES[selected_key]["description"])
     
     # ── Conversation History ──
-    st.markdown("---")
-    st.markdown("<h3>Conversations</h3>", unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-section-hdr">Conversations</div>', unsafe_allow_html=True)
 
     col3, col4 = st.columns(2)
     with col3:
-        if st.button("✦ New Chat", use_container_width=True):
+        if st.button("+ New Chat", use_container_width=True):
             if st.session_state.get("messages"):
                 _save_chat(st.session_state.chat_id, st.session_state.messages)
             st.session_state.messages = []
@@ -1087,13 +1455,13 @@ with st.sidebar:
             except (ValueError, TypeError):
                 time_label = ""
 
-            pin_icon = "📌 " if chat.get("pinned") else ""
+            pin_badge = "[PIN] " if chat.get("pinned") else ""
             is_active = chat["id"] == st.session_state.get("chat_id", "")
 
             # Chat entry row
-            c_load, c_pin, c_del = st.columns([7, 1, 1])
+            c_load, c_pin, c_del = st.columns([7, 1.2, 1.2])
             with c_load:
-                label = f"{pin_icon}{chat['title']}"
+                label = f"{pin_badge}{chat['title']}"
                 if time_label:
                     label += f" · {time_label}"
                 if st.button(label, key=f"load_{chat['id']}", use_container_width=True,
@@ -1106,15 +1474,15 @@ with st.sidebar:
                         st.session_state.chat_id = chat["id"]
                         st.rerun()
             with c_pin:
-                pin_label = "📌" if not chat.get("pinned") else "✕"
-                if st.button(pin_label, key=f"pin_{chat['id']}"):
+                pin_label = "★" if not chat.get("pinned") else "☆"
+                if st.button(pin_label, key=f"pin_{chat['id']}", help="Pin / Unpin"):
                     loaded = _load_chat(chat["id"])
                     if loaded:
                         new_pinned = not chat.get("pinned", False)
                         _save_chat(chat["id"], loaded["messages"], pinned=new_pinned)
                         st.rerun()
             with c_del:
-                if st.button("✕", key=f"del_{chat['id']}"):
+                if st.button("×", key=f"del_{chat['id']}", help="Delete"):
                     _delete_chat(chat["id"])
                     if chat["id"] == st.session_state.get("chat_id"):
                         st.session_state.messages = []
@@ -1124,8 +1492,7 @@ with st.sidebar:
         st.caption("No conversations yet.")
 
     # ── Export Conversation ──
-    st.markdown("---")
-    st.markdown("<h3>Export Conversation</h3>", unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-section-hdr">Export Session</div>', unsafe_allow_html=True)
     
     if st.session_state.get("messages"):
         date_str = datetime.now().strftime("%Y-%m-%d")
@@ -1153,8 +1520,7 @@ with st.sidebar:
         st.caption("Chat is empty.")
 
     # ── Architecture Explorer ──
-    st.markdown("---")
-    st.markdown("<h3>Architecture</h3>", unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-section-hdr">Architecture Explorer</div>', unsafe_allow_html=True)
     repo_root = st.session_state.get("upload_path", DEFAULT_CODEBASE_PATH)
     if os.path.isdir(repo_root):
         repo_data = get_cached_repo_tree(st.session_state, repo_root)
@@ -1162,29 +1528,28 @@ with st.sidebar:
         if tree_stats:
             st.markdown(
                 f'<div class="info-card">'
-                f'<span class="label">Files</span> <span class="value">{tree_stats.get("total_files", 0)}</span><br>'
-                f'<span class="label">Python</span> <span class="value">{tree_stats.get("py_files", 0)}</span><br>'
-                f'<span class="label">Lines</span> <span class="value">{tree_stats.get("total_loc", 0):,}</span>'
+                f'<div class="info-row"><span class="label">Files</span> <span class="value">{tree_stats.get("total_files", 0)}</span></div>'
+                f'<div class="info-row"><span class="label">Python</span> <span class="value">{tree_stats.get("py_files", 0)}</span></div>'
+                f'<div class="info-row"><span class="label">Lines</span> <span class="value">{tree_stats.get("total_loc", 0):,}</span></div>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
 
         # File tree in expander
-        with st.expander("📁 File Explorer", expanded=False):
+        with st.expander("File Explorer", expanded=False):
             tree = repo_data.get("tree", {})
             if tree:
                 def _render_tree(node, depth=0):
                     """Recursively render the file tree."""
                     for name in sorted(node.keys()):
                         info = node[name]
-                        indent = "\u2003" * depth
+                        indent = "&nbsp;&nbsp;&nbsp;&nbsp;" * depth
                         if info.get("is_dir"):
-                            st.markdown(f"{indent}📁 **{name}/**", unsafe_allow_html=True)
+                            st.markdown(f"{indent}<span class='tree-dir'>/ {name}</span>", unsafe_allow_html=True)
                             if info.get("children"):
                                 _render_tree(info["children"], depth + 1)
                         else:
-                            icon = "🐍" if name.endswith(".py") else "📄"
-                            st.markdown(f"{indent}{icon} `{name}`", unsafe_allow_html=True)
+                            st.markdown(f"{indent}<span class='tree-file'>{name}</span>", unsafe_allow_html=True)
                 _render_tree(tree)
             else:
                 st.caption("No files found.")
@@ -1192,7 +1557,7 @@ with st.sidebar:
         # Code structure for .py files
         flat_files = repo_data.get("flat_files", [])
         if flat_files:
-            with st.expander(f"🔍 Code Structure ({len(flat_files)} files)", expanded=False):
+            with st.expander(f"Code Structure ({len(flat_files)} files)", expanded=False):
                 for fpath in flat_files[:30]:  # Cap to avoid UI overload
                     fname = os.path.basename(fpath)
                     structure = extract_file_structure(fpath)
@@ -1200,60 +1565,61 @@ with st.sidebar:
                     functions = structure.get("functions", [])
                     loc = structure.get("loc", 0)
                     summary = f"{len(classes)}C {len(functions)}F {loc}L"
-                    st.markdown(f"🐍 **{fname}** <span style='color:var(--text-muted);font-size:0.78em;'>{summary}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<span class='tree-hdr'><strong>{fname}</strong></span> <span class='tree-summary'>{summary}</span>", unsafe_allow_html=True)
                     for cls in classes:
                         methods_str = ", ".join(cls["methods"][:5])
                         if len(cls["methods"]) > 5:
                             methods_str += f" +{len(cls['methods'])-5}"
-                        st.markdown(f"\u2003🏛️ `{cls['name']}` L{cls['line']} → {methods_str}", unsafe_allow_html=True)
+                        st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;<span class='tag-class'>class</span> <code>{cls['name']}</code> <span class='tree-loc'>L{cls['line']}</span> &rarr; <span class='tree-methods'>{methods_str}</span>", unsafe_allow_html=True)
                     for fn in functions:
-                        st.markdown(f"\u2003ƒ `{fn['name']}` L{fn['line']}", unsafe_allow_html=True)
+                        st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;<span class='tag-func'>def</span> <code>{fn['name']}</code> <span class='tree-loc'>L{fn['line']}</span>", unsafe_allow_html=True)
                 if len(flat_files) > 30:
                     st.caption(f"+ {len(flat_files) - 30} more files...")
 
             # Dependencies analysis
             if flat_files:
-                with st.expander(f"📦 Dependencies", expanded=False):
+                with st.expander("Dependencies", expanded=False):
                     deps = extract_dependencies(flat_files)
                     if deps.get("third_party"):
-                        st.markdown("**Third-Party**")
+                        st.markdown("<span class='sidebar-subhdr'>Third-Party</span>", unsafe_allow_html=True)
                         for pkg in deps["third_party"]:
-                            st.markdown(f"\u2003📦 `{pkg}`")
+                            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;<span class='tag-pkg'>pkg</span> <code>{pkg}</code>", unsafe_allow_html=True)
                     if deps.get("local"):
-                        st.markdown("**Local Modules**")
+                        st.markdown("<span class='sidebar-subhdr'>Local Modules</span>", unsafe_allow_html=True)
                         for mod in deps["local"]:
-                            st.markdown(f"\u2003🏠 `{mod}`")
+                            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;<span class='tag-local'>local</span> <code>{mod}</code>", unsafe_allow_html=True)
                     if deps.get("stdlib"):
-                        st.markdown("**Standard Library**")
+                        st.markdown("<span class='sidebar-subhdr'>Standard Library</span>", unsafe_allow_html=True)
                         for mod in deps["stdlib"]:
-                            st.markdown(f"\u2003⚡ `{mod}`")
+                            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;<span class='tag-std'>std</span> <code>{mod}</code>", unsafe_allow_html=True)
                     if not any(deps.values()):
                         st.caption("No imports detected.")
     else:
         st.caption("Index a repository to explore its architecture.")
 
     # ── About Panel ──
-    st.markdown("---")
     with st.expander("About CodebookLM", expanded=False):
         st.markdown(
-            "**📘 CodebookLM v1.0**<br>"
-            "Offline AI Codebase Assistant<br><br>"
-            "**Mission:**<br>"
-            "Understand software repositories while keeping all source code completely private using local AI.<br><br>"
-            "**Built With:**<br>"
-            "• Streamlit<br>"
-            "• Ollama<br>"
-            "• LlamaIndex<br>"
-            "• ChromaDB<br>"
-            "• Devstral Small 2<br>"
-            "• Local Embeddings",
+            "<strong>CodebookLM v1.0</strong><br>"
+            "<span style='color:#8B95A8;font-size:0.82rem;'>Offline AI Codebase Assistant</span><br><br>"
+            "<span style='color:#5C6478;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;font-weight:650;'>Mission</span><br>"
+            "<span style='color:#8B95A8;font-size:0.78rem;'>Understand software repositories while keeping all source code completely private using local AI.</span><br><br>"
+            "<span style='color:#5C6478;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;font-weight:650;'>Core Engine</span><br>"
+            "<span style='color:#8B95A8;font-size:0.78rem;line-height:1.7;'>"
+            "&bull; Streamlit UI<br>"
+            "&bull; Ollama Engine<br>"
+            "&bull; LlamaIndex RAG<br>"
+            "&bull; ChromaDB Vector Store<br>"
+            "&bull; Devstral Small 2 / Llama 3<br>"
+            "&bull; Local AST Chunker"
+            "</span>",
             unsafe_allow_html=True
         )
 
     # ── Creator Credit ──
     st.markdown(
-        '<div style="text-align:center; padding:16px 0 8px; opacity:0.45; font-size:0.72rem; color:var(--text-muted, #5C6478);">'
-        'Made with \u2764\ufe0f by <strong>Aayush Singh</strong>'
+        '<div class="sidebar-credit">'
+        'Crafted with precision by <strong>Aayush Singh</strong>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -1302,9 +1668,9 @@ if not st.session_state.messages:
         )
     else:
         # Hero section when ready
-        st.markdown('<h1 class="hero-title">📘 CodebookLM v1.0</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 class="hero-title">CodebookLM <span class="hero-version">v1.0</span></h1>', unsafe_allow_html=True)
         st.markdown('<p class="hero-subtitle">Offline AI Codebase Assistant</p>', unsafe_allow_html=True)
-        st.markdown('<p class="hero-desc">Understand • Explore • Explain • Navigate software repositories using Local LLMs.</p>', unsafe_allow_html=True)
+        st.markdown('<p class="hero-desc">Understand &bull; Explore &bull; Explain &bull; Navigate software repositories using Local LLMs.</p>', unsafe_allow_html=True)
         
         st.markdown(
             '<span class="status-badge status-ready">● Index loaded — Ready</span>',
@@ -1459,7 +1825,7 @@ if question:
 # ──────────────────────────────────────────────
 st.markdown(
     '<div class="footer">'
-    '📘 CodebookLM v1.0 &nbsp;&nbsp;|&nbsp;&nbsp; Offline &nbsp;&nbsp;•&nbsp;&nbsp; Private &nbsp;&nbsp;•&nbsp;&nbsp; Local AI &nbsp;&nbsp;•&nbsp;&nbsp; No Internet Required'
+    '<strong>CodebookLM v1.0</strong> &nbsp;&nbsp;|&nbsp;&nbsp; Offline &nbsp;&bull;&nbsp; Private &nbsp;&bull;&nbsp; Local AI &nbsp;&bull;&nbsp; No Internet Required'
     '</div>',
     unsafe_allow_html=True,
 )

@@ -1939,26 +1939,35 @@ for i, msg in enumerate(st.session_state.messages):
             _render_response_actions(i, user_q)
 
 # ──────────────────────────────────────────────
-# Active Background Generation Indicator & Polling
+# Active Background Generation Indicator & Fragment Polling
 # ──────────────────────────────────────────────
-if _bg_manager.is_generating(st.session_state.chat_id):
-    _bg_progress = _bg_manager.get_progress(st.session_state.chat_id) or "Processing..."
-    with st.chat_message("assistant"):
-        col_prog, col_stop = st.columns([5, 1])
-        with col_prog:
-            st.markdown(
-                f'<div style="padding:10px 14px; background:rgba(52,211,153,0.04); border:1px solid rgba(52,211,153,0.18); border-radius:8px; font-size:0.84rem; color:#6EE7B7;">'
-                f'● <strong>Generating response...</strong> {_bg_progress}'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-        with col_stop:
-            if st.button("Stop", key=f"stop_btn_{st.session_state.chat_id}", use_container_width=True):
-                _bg_manager.cancel(st.session_state.chat_id)
-                st.rerun()
+@st.fragment(run_every="1s")
+def _render_generation_progress_fragment(chat_id):
+    """Isolated fragment polling the background task without full page flicker."""
+    manager = BackgroundTaskManager.get_instance()
+    if manager.is_generating(chat_id):
+        steps = manager.get_progress_steps(chat_id)
+        current = manager.get_progress(chat_id) or "Processing..."
+        
+        with st.chat_message("assistant"):
+            with st.status("Processing...", expanded=True) as status:
+                for step in steps:
+                    if step == current and step not in ("Generation complete", "Done!"):
+                        st.write(f"● {step}")
+                    else:
+                        st.write(f"✓ {step}")
+                
+                col_sp, col_stop = st.columns([4, 1])
+                with col_stop:
+                    if st.button("Stop", key=f"stop_btn_frag_{chat_id}", use_container_width=True):
+                        manager.cancel(chat_id)
+                        st.rerun()
+    else:
+        # Task completed or cancelled — trigger top-level rerun to consume and display result
+        st.rerun()
 
-    time.sleep(0.5)
-    st.rerun()
+if _bg_manager.is_generating(st.session_state.chat_id):
+    _render_generation_progress_fragment(st.session_state.chat_id)
 
 # ──────────────────────────────────────────────
 # Chat Input & Background Submission

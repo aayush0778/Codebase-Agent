@@ -7,9 +7,10 @@ Manages background LLM response generation so that:
   - Other chats remain usable during generation
   - Finished results appear when revisiting a chat
   - Cancelled tasks never publish discarded results
+  - Full progress steps history is retained across reruns
 
 Engineering constraints:
-  - Each task has: task_id, chat_id, status, progress, created_at, completed_at, result, error
+  - Each task has: task_id, chat_id, status, progress, progress_steps, created_at, completed_at, result, error
   - Shared state protected with threading.Lock()
   - Every background thread is daemon=True
   - Automatically clean completed tasks after configurable timeout
@@ -44,6 +45,7 @@ class BackgroundTask:
     chat_id: str
     status: TaskStatus = TaskStatus.PENDING
     progress: str = ""
+    progress_steps: List[str] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     completed_at: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
@@ -58,6 +60,7 @@ class BackgroundTaskManager:
         manager = BackgroundTaskManager.get_instance()
         task_id = manager.submit(chat_id, question, generate_fn, **kwargs)
         status = manager.get_status(task_id)
+        steps = manager.get_progress_steps(chat_id)
         result = manager.consume_result(chat_id)
     """
 
@@ -119,6 +122,7 @@ class BackgroundTaskManager:
                 chat_id=chat_id,
                 question=question,
                 progress="Queued...",
+                progress_steps=["Reading question..."],
             )
             self._tasks[task_id] = task
             self._chat_tasks[chat_id] = task_id
@@ -150,12 +154,15 @@ class BackgroundTaskManager:
                 return
             task.status = TaskStatus.RUNNING
             task.progress = "Reading question..."
+            task.progress_steps = ["Reading question..."]
 
         def progress_fn(msg):
             with self._lock:
                 t = self._tasks.get(task_id)
                 if t and t.status == TaskStatus.RUNNING:
                     t.progress = msg
+                    if not t.progress_steps or t.progress_steps[-1] != msg:
+                        t.progress_steps.append(msg)
 
         try:
             # Query engine call
@@ -194,7 +201,9 @@ class BackgroundTaskManager:
                         "context_truncated": ctx_truncated,
                         "quality_info": quality_info,
                     }
-                    task.progress = "Done!"
+                    task.progress = "Generation complete"
+                    if "Generation complete" not in task.progress_steps:
+                        task.progress_steps.append("Generation complete")
             logger.info("Task %s completed successfully", task_id)
         except Exception as e:
             with self._lock:
@@ -219,6 +228,7 @@ class BackgroundTaskManager:
                 "chat_id": task.chat_id,
                 "status": task.status.value,
                 "progress": task.progress,
+                "progress_steps": list(task.progress_steps),
                 "created_at": task.created_at,
                 "completed_at": task.completed_at,
                 "has_result": task.result is not None,
@@ -239,8 +249,18 @@ class BackgroundTaskManager:
                 "task_id": task.task_id,
                 "status": task.status.value,
                 "progress": task.progress,
+                "progress_steps": list(task.progress_steps),
                 "error": task.error,
             }
+
+    def get_progress_steps(self, chat_id: str) -> List[str]:
+        """Get the accumulated list of progress steps for a chat's active task."""
+        with self._lock:
+            task_id = self._chat_tasks.get(chat_id)
+            if not task_id:
+                return []
+            task = self._tasks.get(task_id)
+            return list(task.progress_steps) if task else []
 
     def get_result(self, chat_id: str) -> Optional[Dict[str, Any]]:
         """Get the latest completed result for a chat, if available."""
@@ -296,6 +316,7 @@ class BackgroundTaskManager:
                 task.status = TaskStatus.CANCELLED
                 task.completed_at = datetime.now().isoformat()
                 task.progress = "Generation stopped."
+                task.progress_steps.append("Generation stopped.")
                 del self._chat_tasks[chat_id]
                 logger.info("Cancelled task %s for chat %s", task_id, chat_id)
                 return True

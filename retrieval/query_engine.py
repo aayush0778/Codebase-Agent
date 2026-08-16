@@ -12,7 +12,7 @@ Quality evaluation calculates:
   - Grounding (evidence from citations & symbol overlap)
   - Coverage (volume + file diversity across Top-K)
   - Specificity (deterministic query clarity evaluation)
-  - Overall Heuristic Quality & Actionable Suggestions
+  - Overall Heuristic Quality & Metadata-Driven Suggestions
 """
 
 import logging
@@ -355,21 +355,42 @@ def _compute_quality_info(question: str, rag_answer: str, sources: list, mode: s
     else:
         overall = "Low"
 
-    # 5. Deterministic suggestions
+    # 5. Context-aware, metadata-driven suggestions
     suggestions = []
     if mode == "general":
-        suggestions.append("To query codebase implementation, reference specific filenames, classes, or functions.")
+        suggestions.append("Query did not match indexed codebase entities — mention specific files (.py), classes, or functions to query local code.")
     else:
-        if specificity < 55.0:
-            suggestions.append("Mention specific filenames, classes, or function names in your prompt.")
-        if grounding < 55.0:
-            suggestions.append("Reference a specific function or class to ground the answer more precisely.")
-        if coverage < 55.0:
-            suggestions.append("Ask about a narrower component or ensure all related repository files are indexed.")
-        if retrieval_relevance < 55.0:
-            suggestions.append("Use repository-specific identifiers such as module names or API endpoints.")
-        if len(question.split()) <= 3 and specificity < 40.0:
-            suggestions.append("Clarify what specific component you are asking about and what behavior to explain.")
+        if overall_score >= 75.0 and grounding >= 70.0:
+            # High-confidence grounded responses do not need boilerplate warnings
+            suggestions = []
+        else:
+            candidate_files = list(dict.fromkeys([Path(s.get("file", "")).name for s in sources if s.get("file")]))[:3]
+            candidate_symbols = list(dict.fromkeys([s.get("name") for s in sources if s.get("name") and s.get("name") not in ("module", "unknown")]))[:3]
+
+            if specificity < 55.0:
+                if candidate_symbols:
+                    suggestions.append(f"Target specific symbols such as `{', '.join(candidate_symbols)}` in your next question.")
+                elif candidate_files:
+                    suggestions.append(f"Specify target files like `{', '.join(candidate_files)}` to focus the search.")
+                else:
+                    suggestions.append("Clarify the exact component, class, or method behavior you want to understand.")
+
+            if grounding < 55.0 and sources:
+                answer_lower = rag_answer.lower()
+                unreferenced_symbols = [s for s in candidate_symbols if s.lower() not in answer_lower]
+                if unreferenced_symbols:
+                    suggestions.append(f"Ask specifically about `{', '.join(unreferenced_symbols[:2])}` to pull deeper implementation logic.")
+                else:
+                    suggestions.append("Ask for specific code snippets, method signatures, or input/output flows to strengthen grounding.")
+
+            if coverage < 55.0:
+                if len(candidate_files) == 1:
+                    suggestions.append(f"Only `{candidate_files[0]}` was retrieved — mention related modules if this feature spans multiple files.")
+                else:
+                    suggestions.append("Ask about a narrower submodule or check that all related files were indexed.")
+
+            if retrieval_relevance < 55.0:
+                suggestions.append("Vector match confidence is modest — use exact function names or class identifiers.")
 
     return {
         "grounding": grounding,
@@ -493,7 +514,6 @@ def ask(query_engine, question, history=None, progress_fn=None, style_profile=No
     says_not_found = _answer_says_not_found(rag_answer)
 
     if low_relevance or says_not_found:
-        # Fall back to general-knowledge LLM
         _progress("Low relevance -- switching to general knowledge mode...")
         logger.info(
             "Falling back to general mode (low_relevance=%s, says_not_found=%s)",
@@ -527,7 +547,7 @@ def ask(query_engine, question, history=None, progress_fn=None, style_profile=No
         source_nodes=source_nodes,
     )
 
-    _progress("Done!")
+    _progress("Generation complete")
 
     # Log the query locally for debugging/audit
     _log_query(question, answer_text, sources, mode, best_score)

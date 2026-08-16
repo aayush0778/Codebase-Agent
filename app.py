@@ -1320,19 +1320,37 @@ hr { border-color: rgba(255,255,255,0.04) !important; margin: 1.5rem 0 !importan
 """, unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────
-# Splash screen (first load only)
+# Splash screen state machine (Idempotent, Exactly Once Per Session)
 # ──────────────────────────────────────────────
-if not st.session_state.get("_splash_shown", False):
+if "_splash_started" not in st.session_state:
+    st.session_state["_splash_started"] = False
+if "_splash_shown" not in st.session_state:
+    st.session_state["_splash_shown"] = False
+
+# Detect & clear any query-parameter completion signal safely
+if st.query_params.get("_splash_done") == "1":
+    st.session_state["_splash_started"] = True
     st.session_state["_splash_shown"] = True
-    st.markdown(
-        '<div id="cb-splash">'
-        '<span class="splash-icon">📘</span>'
-        '<span class="splash-title">CodebookLM</span>'
-        '<span class="splash-tagline">Understand Any Codebase. Instantly.</span>'
-        '<span class="splash-divider"></span>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
+    try:
+        del st.query_params["_splash_done"]
+    except Exception:
+        pass
+
+# Render splash markup exactly once during initial session startup
+if not st.session_state["_splash_shown"]:
+    if not st.session_state["_splash_started"]:
+        st.session_state["_splash_started"] = True
+        st.markdown(
+            '<div id="cb-splash">'
+            '<span class="splash-icon">📘</span>'
+            '<span class="splash-title">CodebookLM</span>'
+            '<span class="splash-tagline">Understand Any Codebase. Instantly.</span>'
+            '<span class="splash-divider"></span>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    # Immediately transition lifecycle to shown to ensure subsequent reruns are strictly idempotent
+    st.session_state["_splash_shown"] = True
 
 # ──────────────────────────────────────────────
 # JavaScript: auto-scroll + keyboard shortcuts + copy button
@@ -1346,10 +1364,11 @@ components.html("""
     var splashEl = stDoc.getElementById('cb-splash');
     if (splashEl) {
         setTimeout(function() {
-            if (splashEl && splashEl.parentNode) {
-                splashEl.parentNode.removeChild(splashEl);
+            var el = stDoc.getElementById('cb-splash');
+            if (el && el.parentNode) {
+                el.parentNode.removeChild(el);
             }
-        }, 3200);
+        }, 2800);
     }
 
     /* ── AUTO-SCROLL ── */

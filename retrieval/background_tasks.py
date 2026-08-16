@@ -2,16 +2,19 @@
 Background Task Manager — Thread-safe async generation for CodebookLM.
 
 Manages background LLM response generation so that:
-  - Generation continues after switching chats
+  - Normal user generation executes asynchronously without freezing the UI
+  - Generation continues across switching chats
   - Other chats remain usable during generation
   - Finished results appear when revisiting a chat
+  - Cancelled tasks never publish discarded results
 
-Engineering constraints (from addendum):
+Engineering constraints:
   - Each task has: task_id, chat_id, status, progress, created_at, completed_at, result, error
   - Shared state protected with threading.Lock()
   - Every background thread is daemon=True
   - Automatically clean completed tasks after configurable timeout
   - Prevent multiple simultaneous generations for the same chat
+  - Check cancellation state before committing COMPLETED
 """
 
 import logging
@@ -55,7 +58,7 @@ class BackgroundTaskManager:
         manager = BackgroundTaskManager.get_instance()
         task_id = manager.submit(chat_id, question, generate_fn, **kwargs)
         status = manager.get_status(task_id)
-        result = manager.get_result(chat_id)  # returns latest completed result for chat
+        result = manager.consume_result(chat_id)
     """
 
     _instance = None
@@ -90,7 +93,7 @@ class BackgroundTaskManager:
             question: The user question.
             generate_fn: Callable that performs the generation.
                 Must accept (question, progress_fn=, **kwargs) and return
-                (answer, sources, mode, best_score, context_truncated).
+                (answer, sources, mode, best_score, context_truncated, quality_info).
             **kwargs: Additional keyword arguments for generate_fn.
 
         Returns:
@@ -115,6 +118,7 @@ class BackgroundTaskManager:
                 task_id=task_id,
                 chat_id=chat_id,
                 question=question,
+                progress="Queued...",
             )
             self._tasks[task_id] = task
             self._chat_tasks[chat_id] = task_id
@@ -141,20 +145,44 @@ class BackgroundTaskManager:
             task = self._tasks.get(task_id)
             if not task:
                 return
+            # If already cancelled before thread started
+            if task.status == TaskStatus.CANCELLED:
+                return
             task.status = TaskStatus.RUNNING
+            task.progress = "Reading question..."
 
         def progress_fn(msg):
             with self._lock:
                 t = self._tasks.get(task_id)
-                if t:
+                if t and t.status == TaskStatus.RUNNING:
                     t.progress = msg
 
         try:
-            result = generate_fn(question, progress_fn=progress_fn, **kwargs)
-            # Unpack the 5-tuple from ask()
-            answer, sources, mode, best_score, ctx_truncated = result
+            # Query engine call
+            query_engine = kwargs.pop("query_engine", None)
+            if query_engine is not None:
+                result = generate_fn(query_engine, question, progress_fn=progress_fn, **kwargs)
+            else:
+                result = generate_fn(question, progress_fn=progress_fn, **kwargs)
+
+            # Unpack 6-tuple: answer, sources, mode, best_score, context_truncated, quality_info
+            if isinstance(result, tuple) and len(result) == 6:
+                answer, sources, mode, best_score, ctx_truncated, quality_info = result
+            elif isinstance(result, tuple) and len(result) == 5:
+                answer, sources, mode, best_score, ctx_truncated = result
+                quality_info = None
+            else:
+                answer = str(result)
+                sources, mode, best_score, ctx_truncated, quality_info = [], "general", 0.0, False, None
+
             with self._lock:
                 task = self._tasks.get(task_id)
+                # CRITICAL: If the task was cancelled while Ollama was running,
+                # do NOT commit COMPLETED and do NOT publish results.
+                if task and task.status == TaskStatus.CANCELLED:
+                    logger.info("Task %s completed after cancellation — discarding result.", task_id)
+                    return
+
                 if task:
                     task.status = TaskStatus.COMPLETED
                     task.completed_at = datetime.now().isoformat()
@@ -164,12 +192,15 @@ class BackgroundTaskManager:
                         "mode": mode,
                         "best_score": best_score,
                         "context_truncated": ctx_truncated,
+                        "quality_info": quality_info,
                     }
                     task.progress = "Done!"
             logger.info("Task %s completed successfully", task_id)
         except Exception as e:
             with self._lock:
                 task = self._tasks.get(task_id)
+                if task and task.status == TaskStatus.CANCELLED:
+                    return
                 if task:
                     task.status = TaskStatus.FAILED
                     task.completed_at = datetime.now().isoformat()
@@ -195,12 +226,24 @@ class BackgroundTaskManager:
                 "question": task.question,
             }
 
-    def get_result(self, chat_id: str) -> Optional[Dict[str, Any]]:
-        """Get the latest completed result for a chat, if available.
+    def get_chat_status(self, chat_id: str) -> Optional[Dict[str, Any]]:
+        """Get the status of the active or latest task for a chat_id."""
+        with self._lock:
+            task_id = self._chat_tasks.get(chat_id)
+            if not task_id:
+                return None
+            task = self._tasks.get(task_id)
+            if not task:
+                return None
+            return {
+                "task_id": task.task_id,
+                "status": task.status.value,
+                "progress": task.progress,
+                "error": task.error,
+            }
 
-        Returns None if no completed task exists for this chat.
-        Does NOT remove the result — call consume_result() for that.
-        """
+    def get_result(self, chat_id: str) -> Optional[Dict[str, Any]]:
+        """Get the latest completed result for a chat, if available."""
         with self._lock:
             task_id = self._chat_tasks.get(chat_id)
             if not task_id:
@@ -211,10 +254,7 @@ class BackgroundTaskManager:
             return task.result
 
     def consume_result(self, chat_id: str) -> Optional[Dict[str, Any]]:
-        """Get and remove the latest completed result for a chat.
-
-        Returns None if no completed task exists.
-        """
+        """Get and remove the latest completed result for a chat."""
         with self._lock:
             task_id = self._chat_tasks.get(chat_id)
             if not task_id:
@@ -223,7 +263,6 @@ class BackgroundTaskManager:
             if not task or task.status != TaskStatus.COMPLETED:
                 return None
             result = task.result
-            # Clean up
             del self._chat_tasks[chat_id]
             del self._tasks[task_id]
             return result
@@ -247,7 +286,7 @@ class BackgroundTaskManager:
             return task.progress if task else ""
 
     def cancel(self, chat_id: str) -> bool:
-        """Cancel a running task for a chat (marks as cancelled, thread will finish naturally)."""
+        """Cancel a running task for a chat."""
         with self._lock:
             task_id = self._chat_tasks.get(chat_id)
             if not task_id:
@@ -256,10 +295,25 @@ class BackgroundTaskManager:
             if task and task.status in (TaskStatus.PENDING, TaskStatus.RUNNING):
                 task.status = TaskStatus.CANCELLED
                 task.completed_at = datetime.now().isoformat()
+                task.progress = "Generation stopped."
                 del self._chat_tasks[chat_id]
                 logger.info("Cancelled task %s for chat %s", task_id, chat_id)
                 return True
             return False
+
+    def clear_failed(self, chat_id: str) -> Optional[str]:
+        """Clear a failed task for a chat and return the error message."""
+        with self._lock:
+            task_id = self._chat_tasks.get(chat_id)
+            if not task_id:
+                return None
+            task = self._tasks.get(task_id)
+            if task and task.status == TaskStatus.FAILED:
+                err = task.error or "Unknown error"
+                del self._chat_tasks[chat_id]
+                del self._tasks[task_id]
+                return err
+            return None
 
     def _ensure_cleanup_thread(self):
         """Start the cleanup thread if not already running."""
@@ -276,9 +330,9 @@ class BackgroundTaskManager:
         thread.start()
 
     def _cleanup_loop(self):
-        """Periodically clean up completed/failed tasks older than timeout."""
+        """Periodically clean up completed/failed/cancelled tasks older than timeout."""
         while True:
-            time.sleep(60)  # Check every minute
+            time.sleep(60)
             cutoff = time.time() - self._cleanup_timeout
             with self._lock:
                 to_remove = []

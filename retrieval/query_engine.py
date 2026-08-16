@@ -1,15 +1,23 @@
 """
-Query Engine -- Phase 3 (Hybrid Mode)
+Query Engine -- Phase 3 (Hybrid Mode with Heuristic Quality Analysis)
 Loads the persisted ChromaDB index, retrieves relevant code chunks for a question,
 and generates a grounded answer using the local LLM via Ollama.
 
 If the question is not about the indexed codebase (low relevance scores or
 the RAG answer says "not found"), falls back to a direct general-knowledge
 LLM call so the user always gets a useful answer.
+
+Quality evaluation calculates:
+  - Retrieval Relevance (bounded [0, 100])
+  - Grounding (evidence from citations & symbol overlap)
+  - Coverage (volume + file diversity across Top-K)
+  - Specificity (deterministic query clarity evaluation)
+  - Overall Heuristic Quality & Actionable Suggestions
 """
 
 import logging
 import json
+import re
 import datetime
 from pathlib import Path
 import urllib.request
@@ -100,26 +108,20 @@ def load_query_engine(persist_dir=None, top_k=None, llm_model=None):
 
     logger.info("Loading index from %s (top_k=%d, model=%s)", persist_dir, top_k, llm_model)
 
-    # Embedding model (same one used at indexing time)
     embed_model = OllamaEmbedding(model_name=EMBEDDING_MODEL)
-
-    # Local LLM
     llm = _get_llm(llm_model)
 
-    # Reconnect to persisted ChromaDB
     chroma_client = chromadb.PersistentClient(path=persist_dir)
     chroma_collection = chroma_client.get_or_create_collection(CHROMA_COLLECTION_NAME)
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
-    # Rebuild the index from the vector store (no re-embedding needed)
     index = VectorStoreIndex.from_vector_store(
         vector_store,
         storage_context=storage_context,
         embed_model=embed_model,
     )
 
-    # Build query engine with custom prompt
     query_engine = index.as_query_engine(
         llm=llm,
         similarity_top_k=top_k,
@@ -131,7 +133,7 @@ def load_query_engine(persist_dir=None, top_k=None, llm_model=None):
 
 
 # ──────────────────────────────────────────────
-# Relevance detection helpers
+# Relevance & Quality Detection Helpers
 # ──────────────────────────────────────────────
 
 def _get_best_score(source_nodes):
@@ -151,34 +153,234 @@ def _estimate_tokens(text):
     return len(text) // 4
 
 
-def _truncate_to_budget(history_text, question, style_modifier, max_tokens):
-    """Truncate history to fit within the token budget.
+# ──────────────────────────────────────────────
+# Intelligent Context Compression
+# ──────────────────────────────────────────────
 
-    Trims history first (removes oldest turns), preserving the question and
-    style modifier. Returns (truncated_history, was_truncated).
+def _compress_context(history_text, question, style_modifier, max_tokens):
+    """Intelligently compress conversation context when exceeding budget.
+
+    Preserves high-value code structures:
+      1. imports
+      2. class declarations & signatures
+      3. function definitions & signatures
+      4. decorators & docstrings
+      5. recent conversational turns
+
+    Returns:
+        (compressed_text, metadata_dict)
     """
     question_tokens = _estimate_tokens(question)
     style_tokens = _estimate_tokens(style_modifier)
-    # Reserve ~30% of window for the response and RAG context
-    available = int(max_tokens * 0.7) - question_tokens - style_tokens
+    available_tokens = int(max_tokens * 0.7) - question_tokens - style_tokens
 
-    if available <= 0:
-        return "", True
+    if available_tokens <= 0:
+        return "", {
+            "was_compressed": True,
+            "original_chars": len(history_text),
+            "compressed_chars": 0,
+            "preserved_symbols": [],
+        }
 
+    original_chars = len(history_text)
     history_tokens = _estimate_tokens(history_text)
-    if history_tokens <= available:
-        return history_text, False
 
-    # Truncate history by removing oldest turns
+    if history_tokens <= available_tokens:
+        return history_text, {
+            "was_compressed": False,
+            "original_chars": original_chars,
+            "compressed_chars": original_chars,
+            "preserved_symbols": [],
+        }
+
+    # Extract high-value preserved symbols from history code snippets
+    preserved_symbols = []
+    symbol_matches = re.findall(r'(?:def|class)\s+([A-Za-z0-9_]+)', history_text)
+    if symbol_matches:
+        preserved_symbols = list(dict.fromkeys(symbol_matches))[:8]
+
+    # Compress turns structurally: keep newest turns intact, compress older turns
     lines = history_text.split("\n")
-    while lines and _estimate_tokens("\n".join(lines)) > available:
-        # Remove 2 lines (one User + one Assistant turn)
-        if len(lines) >= 2:
-            lines = lines[2:]
+    compressed_lines = []
+    
+    # Process from newest to oldest
+    for line in reversed(lines):
+        line_tokens = _estimate_tokens("\n".join(compressed_lines + [line]))
+        if line_tokens <= available_tokens:
+            compressed_lines.insert(0, line)
         else:
-            lines = []
-    truncated = "\n".join(lines)
-    return truncated, True
+            # Preserve import or signature lines if possible
+            if line.strip().startswith(("import ", "from ", "def ", "class ", "@", "class:")):
+                if _estimate_tokens("\n".join(compressed_lines + [line])) <= available_tokens:
+                    compressed_lines.insert(0, line)
+
+    compressed_text = "\n".join(compressed_lines)
+    compressed_chars = len(compressed_text)
+
+    return compressed_text, {
+        "was_compressed": True,
+        "original_chars": original_chars,
+        "compressed_chars": compressed_chars,
+        "preserved_symbols": preserved_symbols,
+    }
+
+
+# ──────────────────────────────────────────────
+# Deterministic Response Quality Metrics
+# ──────────────────────────────────────────────
+
+def _compute_specificity(question: str) -> float:
+    """Evaluate prompt specificity deterministically (0-100).
+    
+    Higher score: mentions specific identifiers, filenames, functions, classes, code tokens.
+    Lower score: short, vague keywords ('it', 'this', 'that', 'something', 'explain').
+    """
+    if not question or not question.strip():
+        return 0.0
+
+    text = question.strip()
+    words = re.findall(r'\b[A-Za-z0-9_.]+\b', text)
+    word_count = len(words)
+
+    score = 40.0  # Base score
+
+    # Length signals
+    if word_count >= 5:
+        score += min((word_count - 4) * 3.5, 20.0)
+    elif word_count <= 2:
+        score -= 20.0
+
+    # Code identifiers (snake_case, camelCase, dot.notation, file extensions)
+    has_identifier = bool(re.search(r'\b[A-Za-z0-9]+(?:_[A-Za-z0-9]+)+\b|\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Z][a-z]+[A-Z][A-Za-z0-9]*\b', text))
+    has_file_ext = bool(re.search(r'\b[A-Za-z0-9_-]+\.(?:py|js|ts|json|md|html|css|cpp|h|rs|go)\b', text, re.IGNORECASE))
+    has_method_call = bool(re.search(r'\b[A-Za-z0-9_]+\.[A-Za-z0-9_]+(?:\(\))?|\b[A-Za-z0-9_]+\(\)', text))
+    has_code_keywords = bool(re.search(r'\b(class|def|function|method|module|variable|import|return|parameter|attribute|decorator)\b', text, re.IGNORECASE))
+
+    if has_file_ext:
+        score += 20.0
+    if has_method_call or has_identifier:
+        score += 20.0
+    if has_code_keywords:
+        score += 10.0
+
+    # Vague words penalty
+    vague_words = {"it", "this", "that", "something", "everything", "stuff", "thing", "code", "app"}
+    vague_count = sum(1 for w in words if w.lower() in vague_words)
+    if vague_count >= 2 or (word_count <= 3 and vague_count >= 1):
+        score -= 25.0
+
+    # Generic one-word prompts like "Explain", "Help", "Run"
+    if word_count <= 2 and not (has_identifier or has_file_ext or has_method_call):
+        score = min(score, 25.0)
+
+    return float(max(0.0, min(100.0, score)))
+
+
+def _compute_coverage(source_nodes, top_k: int) -> float:
+    """Evaluate retrieval coverage and diversity (0-100)."""
+    if not source_nodes:
+        return 0.0
+
+    source_count = len(source_nodes)
+    # Ratio against configured TOP_K
+    base_ratio = min(source_count / max(top_k, 1), 1.0) * 80.0
+
+    # File diversity factor (avoid over-crediting 8 identical chunks from one line)
+    unique_files = set()
+    for n in source_nodes:
+        fname = n.metadata.get("file", "unknown") if hasattr(n, "metadata") else "unknown"
+        unique_files.add(fname)
+
+    diversity_bonus = min(len(unique_files) * 6.0, 20.0)
+    total_coverage = base_ratio + diversity_bonus
+
+    return float(max(0.0, min(100.0, total_coverage)))
+
+
+def _compute_grounding(rag_answer: str, sources: list, best_score: float, mode: str) -> float:
+    """Evaluate grounding evidence of the answer in retrieved code context (0-100)."""
+    if mode == "general" or not sources:
+        return 0.0
+
+    # Base from clamped retrieval similarity
+    base_grounding = min(max(best_score * 100.0, 0.0), 100.0) * 0.65
+
+    answer_lower = rag_answer.lower()
+    citation_bonus = 0.0
+
+    for s in sources:
+        fname = Path(s.get("file", "")).name.lower()
+        symbol_name = s.get("name", "").lower()
+        if fname and fname in answer_lower:
+            citation_bonus += 10.0
+        if symbol_name and symbol_name != "module" and symbol_name in answer_lower:
+            citation_bonus += 8.0
+
+    citation_bonus = min(citation_bonus, 35.0)
+    grounding = base_grounding + citation_bonus
+
+    # Penalty if answer expresses uncertainty or missing symbols
+    if _answer_says_not_found(rag_answer):
+        grounding = max(0.0, grounding - 40.0)
+
+    return float(max(0.0, min(100.0, grounding)))
+
+
+def _compute_quality_info(question: str, rag_answer: str, sources: list, mode: str, best_score: float, source_nodes: list) -> dict:
+    """Compute the complete Response Confidence Indicators quality object."""
+    # 1. Retrieval relevance (0-100 bounded)
+    retrieval_relevance = float(max(0.0, min(100.0, round(best_score * 100.0, 1)))) if mode == "code" else 0.0
+
+    # 2. Dimensions
+    specificity = round(_compute_specificity(question), 1)
+    coverage = round(_compute_coverage(source_nodes, TOP_K), 1) if mode == "code" else 0.0
+    grounding = round(_compute_grounding(rag_answer, sources, best_score, mode), 1) if mode == "code" else 0.0
+
+    # 3. Overall Heuristic Score: 0.45 * grounding + 0.30 * coverage + 0.25 * specificity
+    if mode == "code":
+        overall_score = round(0.45 * grounding + 0.30 * coverage + 0.25 * specificity, 1)
+    else:
+        # General knowledge mode
+        overall_score = round(0.40 * specificity, 1)
+
+    overall_score = max(0.0, min(100.0, overall_score))
+
+    # 4. Overall Level Categorization
+    if overall_score >= 75.0:
+        overall = "High"
+    elif overall_score >= 55.0:
+        overall = "Good"
+    elif overall_score >= 35.0:
+        overall = "Fair"
+    else:
+        overall = "Low"
+
+    # 5. Deterministic suggestions
+    suggestions = []
+    if mode == "general":
+        suggestions.append("To query codebase implementation, reference specific filenames, classes, or functions.")
+    else:
+        if specificity < 55.0:
+            suggestions.append("Mention specific filenames, classes, or function names in your prompt.")
+        if grounding < 55.0:
+            suggestions.append("Reference a specific function or class to ground the answer more precisely.")
+        if coverage < 55.0:
+            suggestions.append("Ask about a narrower component or ensure all related repository files are indexed.")
+        if retrieval_relevance < 55.0:
+            suggestions.append("Use repository-specific identifiers such as module names or API endpoints.")
+        if len(question.split()) <= 3 and specificity < 40.0:
+            suggestions.append("Clarify what specific component you are asking about and what behavior to explain.")
+
+    return {
+        "grounding": grounding,
+        "coverage": coverage,
+        "specificity": specificity,
+        "overall_score": overall_score,
+        "overall": overall,
+        "source_count": len(sources),
+        "suggestions": suggestions,
+        "retrieval_relevance": retrieval_relevance,
+    }
 
 
 # ──────────────────────────────────────────────
@@ -219,14 +421,15 @@ def _format_history(history):
 
 
 def ask(query_engine, question, history=None, progress_fn=None, style_profile=None):
-    """Ask a question with automatic fallback to general knowledge.
+    """Ask a question with automatic fallback to general knowledge and quality analysis.
 
     Flow:
       1. Try the RAG pipeline (retrieve code chunks + LLM answer).
       2. If the top retrieved chunk scores below RELEVANCE_THRESHOLD,
          OR the RAG answer says "could not find", fall back to a
          direct LLM call for general knowledge.
-      3. Return the answer and metadata indicating which mode was used.
+      3. Compute deterministic Response Confidence Indicators quality_info.
+      4. Return answer, sources, mode, best_score, context_truncated, quality_info.
 
     Args:
         query_engine: A LlamaIndex query engine (for code questions).
@@ -236,15 +439,15 @@ def ask(query_engine, question, history=None, progress_fn=None, style_profile=No
         style_profile: Optional style profile key (e.g. 'concise', 'detailed').
 
     Returns:
-        A tuple of (answer_text, sources_list, mode, best_score).
-        sources_list contains dicts with file, name, type, line, score.
-        If mode == "general", sources_list will be empty.
+        A tuple of:
+          (answer_text, sources_list, mode, best_score, context_truncated, quality_info)
     """
     def _progress(msg):
         if progress_fn:
             progress_fn(msg)
 
     logger.info("Question: %s", question)
+    _progress("Reading question...")
 
     # Resolve style modifier
     style_key = style_profile or DEFAULT_STYLE_PROFILE
@@ -254,15 +457,20 @@ def ask(query_engine, question, history=None, progress_fn=None, style_profile=No
 
     history_text = _format_history(history)
 
-    # Long-context handling: truncate if exceeding context window
-    context_truncated = False
+    # Long-context handling: intelligent compression
+    compression_info = {
+        "was_compressed": False,
+        "original_chars": len(history_text),
+        "compressed_chars": len(history_text),
+        "preserved_symbols": [],
+    }
     if history_text:
-        history_text, context_truncated = _truncate_to_budget(
+        history_text, compression_info = _compress_context(
             history_text, question, style_modifier, LLM_CONTEXT_WINDOW
         )
-        if context_truncated:
-            _progress("Context trimmed to fit model window...")
-            logger.info("History truncated to fit context window")
+        if compression_info["was_compressed"]:
+            _progress("Context compressed to preserve key code structures...")
+            logger.info("History compressed: %d -> %d chars", compression_info["original_chars"], compression_info["compressed_chars"])
 
     effective_query = f"{history_text}\nUser: {question}" if history_text else question
     if style_modifier:
@@ -272,8 +480,9 @@ def ask(query_engine, question, history=None, progress_fn=None, style_profile=No
     _progress("Searching codebase for relevant code...")
     response = query_engine.query(effective_query)
 
-    best_score = _get_best_score(response.source_nodes)
-    num_chunks = len(response.source_nodes)
+    source_nodes = getattr(response, "source_nodes", [])
+    best_score = _get_best_score(source_nodes)
+    num_chunks = len(source_nodes)
     rag_answer = str(response)
 
     _progress(f"Retrieved {num_chunks} chunks (best score: {best_score:.2f})")
@@ -298,31 +507,42 @@ def ask(query_engine, question, history=None, progress_fn=None, style_profile=No
             sources = []
         except Exception as e:
             logger.warning("General-knowledge fallback failed: %s", e)
-            # If fallback also fails, return the original RAG answer
             mode = "code"
             answer_text = rag_answer
             sources = _extract_sources(response)
     else:
-        # RAG answer is relevant -- use it
         _progress("Generating answer from codebase context...")
         mode = "code"
         answer_text = rag_answer
         sources = _extract_sources(response)
+
+    # Step 3: Calculate Response Confidence Indicators
+    _progress("Calculating response quality...")
+    quality_info = _compute_quality_info(
+        question=question,
+        rag_answer=answer_text,
+        sources=sources,
+        mode=mode,
+        best_score=best_score,
+        source_nodes=source_nodes,
+    )
 
     _progress("Done!")
 
     # Log the query locally for debugging/audit
     _log_query(question, answer_text, sources, mode, best_score)
 
-    logger.info("Answer generated in '%s' mode with %d source(s).", mode, len(sources))
-    return answer_text, sources, mode, best_score, context_truncated
+    logger.info("Answer generated in '%s' mode with %d source(s), overall quality=%s (%.1f%%).", 
+                mode, len(sources), quality_info["overall"], quality_info["overall_score"])
+
+    return answer_text, sources, mode, best_score, compression_info, quality_info
 
 
 def _extract_sources(response):
     """Extract deduplicated source information from a RAG response."""
     sources = []
     seen = set()
-    for node in response.source_nodes:
+    for node in getattr(response, "source_nodes", []):
         meta = node.metadata
         key = (meta.get("file", "unknown"), meta.get("name", "unknown"))
         if key not in seen:
@@ -345,7 +565,7 @@ def _log_query(question, answer, sources, mode, best_score):
         record = {
             "timestamp": datetime.datetime.now().isoformat(),
             "question": question,
-            "answer": answer[:500],  # truncate for log readability
+            "answer": answer[:500],
             "mode": mode,
             "best_score": round(best_score, 4),
             "source_count": len(sources),

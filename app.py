@@ -223,49 +223,138 @@ def _get_gpu_info():
     return {"available": False, "name": "N/A", "vram_total": "N/A", "vram_free": "N/A"}
 
 
-def _render_mode_badge(mode, confidence=None, num_sources=0):
-    """Render an HTML mode badge with optional confidence indicator.
+def _bar_color(val):
+    if val >= 75: return "#34D399"
+    if val >= 55: return "#6EE7B7"
+    if val >= 35: return "#FDE047"
+    return "#F87171"
+
+
+def _render_confidence_panel(quality_info, mode, confidence=None, source_count=0):
+    """Render Response Confidence Indicators panel.
     
-    Quality indicators are labeled as heuristics, never as model certainty.
-    Title: 'Response Confidence Indicators' with disclaimer.
+    Exact Title: Response Confidence Indicators
+    Exact Disclaimer: This is a heuristic based on retrieval quality and context coverage. It is NOT the model's confidence.
     """
-    if mode == "code":
-        if confidence is not None:
-            pct = int(confidence * 100)
-            if pct >= 70:
-                bar_color = "var(--accent, #34D399)"
-                level = "High"
-            elif pct >= 40:
-                bar_color = "var(--yellow-text, #fde047)"
-                level = "Medium"
-            else:
-                bar_color = "#f87171"
-                level = "Low"
-            conf_html = (
-                f'<div class="confidence-panel">'
-                f'<div class="confidence-header">'
-                f'<span class="mode-badge mode-code">● Codebase</span>'
-                f'<span class="confidence-label">{level} Relevance · {pct}%</span>'
-                f'</div>'
-                f'<div class="confidence-bar-track">'
-                f'<div class="confidence-bar-fill" style="width:{pct}%; background:{bar_color};"></div>'
-                f'</div>'
-                f'<div class="confidence-meta">'
-                f'{num_sources} source{"s" if num_sources != 1 else ""} referenced'
-                f' · <span class="confidence-disclaimer">Heuristic estimate based on retrieval similarity</span>'
-                f'</div>'
-                f'</div>'
-            )
-            return conf_html
-        else:
+    if not quality_info:
+        # Fallback for historical chats without quality_info
+        if mode == "code" and confidence is not None:
+            pct = int(min(max(confidence * 100, 0), 100))
+            level = "High" if pct >= 75 else ("Good" if pct >= 55 else ("Fair" if pct >= 35 else "Low"))
+            color = _bar_color(pct)
             return (
-                f'<span class="mode-badge mode-code">'
-                f'● Codebase</span>'
+                f'<div class="confidence-panel">'
+                f'<div class="confidence-title"><span>Response Confidence Indicators</span> <span class="mode-badge mode-code">● Codebase</span></div>'
+                f'<div class="confidence-overall-row">'
+                f'<span>Retrieval Relevance</span><strong style="color:{color};">{level} · {pct}%</strong>'
+                f'</div>'
+                f'<div class="confidence-meta-row"><span>{source_count} source{"s" if source_count != 1 else ""} referenced</span></div>'
+                f'<div class="confidence-disclaimer">This is a heuristic based on retrieval quality and context coverage. It is NOT the model\'s confidence.</div>'
+                f'</div>'
             )
-    elif mode == "general":
+        elif mode == "general":
+            return (
+                f'<div class="confidence-panel">'
+                f'<div class="confidence-title"><span>Response Confidence Indicators</span> <span class="mode-badge mode-general">● General Knowledge</span></div>'
+                f'<div class="general-note" style="margin:0 0 8px 0;">No sufficiently relevant repository context was retrieved for this question.</div>'
+                f'<div class="confidence-disclaimer">This is a heuristic based on retrieval quality and context coverage. It is NOT the model\'s confidence.</div>'
+                f'</div>'
+            )
+        return ""
+
+    grounding = quality_info.get("grounding", 0.0)
+    coverage = quality_info.get("coverage", 0.0)
+    specificity = quality_info.get("specificity", 0.0)
+    overall_score = quality_info.get("overall_score", 0.0)
+    overall_level = quality_info.get("overall", "Low")
+    retrieval_relevance = quality_info.get("retrieval_relevance", 0.0)
+    suggestions = quality_info.get("suggestions", [])
+    src_count = quality_info.get("source_count", source_count)
+
+    overall_color = _bar_color(overall_score)
+    badge_cls = "mode-code" if mode == "code" else "mode-general"
+    badge_label = "● Codebase" if mode == "code" else "● General Knowledge"
+
+    suggestions_html = ""
+    if suggestions:
+        sug_items = "".join(f"<li>{s}</li>" for s in suggestions)
+        suggestions_html = (
+            f'<div class="confidence-suggestions">'
+            f'<strong>Suggestions:</strong>'
+            f'<ul>{sug_items}</ul>'
+            f'</div>'
+        )
+
+    if mode == "general":
         return (
-            '<span class="mode-badge mode-general">'
-            '● General Knowledge</span>'
+            f'<div class="confidence-panel">'
+            f'<div class="confidence-title"><span>Response Confidence Indicators</span> <span class="mode-badge {badge_cls}">{badge_label}</span></div>'
+            f'<div class="general-note" style="margin:0 0 8px 0;">'
+            f'No sufficiently relevant repository context was retrieved for this question.'
+            f'</div>'
+            f'<div class="confidence-overall-row">'
+            f'<span>Query Specificity</span><strong style="color:{_bar_color(specificity)};">{specificity:.0f}%</strong>'
+            f'</div>'
+            f'{suggestions_html}'
+            f'<div class="confidence-disclaimer">'
+            f'This is a heuristic based on retrieval quality and context coverage. It is NOT the model\'s confidence.'
+            f'</div>'
+            f'</div>'
+        )
+
+    return (
+        f'<div class="confidence-panel">'
+        f'<div class="confidence-title"><span>Response Confidence Indicators</span> <span class="mode-badge {badge_cls}">{badge_label}</span></div>'
+        f'<div class="confidence-grid">'
+        f'<div class="confidence-metric-card">'
+        f'<div class="metric-label"><span>Grounding</span><span class="metric-val">{grounding:.0f}%</span></div>'
+        f'<div class="metric-bar-track"><div class="metric-bar-fill" style="width:{grounding}%; background:{_bar_color(grounding)};"></div></div>'
+        f'</div>'
+        f'<div class="confidence-metric-card">'
+        f'<div class="metric-label"><span>Coverage</span><span class="metric-val">{coverage:.0f}%</span></div>'
+        f'<div class="metric-bar-track"><div class="metric-bar-fill" style="width:{coverage}%; background:{_bar_color(coverage)};"></div></div>'
+        f'</div>'
+        f'<div class="confidence-metric-card">'
+        f'<div class="metric-label"><span>Specificity</span><span class="metric-val">{specificity:.0f}%</span></div>'
+        f'<div class="metric-bar-track"><div class="metric-bar-fill" style="width:{specificity}%; background:{_bar_color(specificity)};"></div></div>'
+        f'</div>'
+        f'</div>'
+        f'<div class="confidence-overall-row">'
+        f'<span>Overall Quality</span>'
+        f'<strong style="color:{overall_color};">{overall_level} · {overall_score:.0f}%</strong>'
+        f'</div>'
+        f'<div class="confidence-meta-row">'
+        f'<span>Sources: {src_count} retrieved chunks</span>'
+        f'<span>Retrieval Relevance: {retrieval_relevance:.0f}%</span>'
+        f'</div>'
+        f'{suggestions_html}'
+        f'<div class="confidence-disclaimer">'
+        f'This is a heuristic based on retrieval quality and context coverage. It is NOT the model\'s confidence.'
+        f'</div>'
+        f'</div>'
+    )
+
+
+def _render_compression_notice(context_truncated):
+    """Render structured compression notice or legacy truncation note."""
+    if not context_truncated:
+        return ""
+    if isinstance(context_truncated, dict) and context_truncated.get("was_compressed"):
+        orig = context_truncated.get("original_chars", 0)
+        comp = context_truncated.get("compressed_chars", 0)
+        symbols = context_truncated.get("preserved_symbols", [])
+        sym_text = f" ({', '.join(symbols[:3])})" if symbols else ""
+        return (
+            f'<div class="general-note" style="border-color:rgba(234,179,8,0.2); background:rgba(234,179,8,0.03); color:#fde047;">'
+            f'⚠ <strong>Context Compressed</strong> — {orig:,} → {comp:,} characters. '
+            f'Important symbols{sym_text}, signatures, imports, docstrings and relevant bodies were preserved.'
+            f'</div>'
+        )
+    elif context_truncated is True:
+        return (
+            f'<div class="general-note" style="border-color:rgba(234,179,8,0.2); background:rgba(234,179,8,0.03); color:#fde047;">'
+            f'⚠ <strong>Context Trimmed</strong> — Conversation history was truncated to fit the model context window.'
+            f'</div>'
         )
     return ""
 
@@ -955,35 +1044,100 @@ p.hero-desc {
     transform: scale(0.95) !important; transition-duration: 80ms !important;
 }
 
-/* ═══════ CONFIDENCE INDICATOR ═══════ */
+/* ═══════ RESPONSE CONFIDENCE INDICATORS ═══════ */
 .confidence-panel {
-    padding: 10px 14px; margin-bottom: 10px;
-    background: rgba(255,255,255,0.015);
-    border: 1px solid rgba(255,255,255,0.04);
-    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    margin: 8px 0 14px 0;
+    background: rgba(255, 255, 255, 0.018);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
-.confidence-header {
-    display: flex; align-items: center; justify-content: space-between;
+.confidence-title {
+    font-size: 0.74rem;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #8B95A8;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.confidence-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.confidence-metric-card {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 6px;
+    padding: 6px 8px;
+}
+.metric-label {
+    font-size: 0.70rem;
+    color: #5C6478;
+    margin-bottom: 2px;
+    display: flex;
+    justify-content: space-between;
+}
+.metric-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #EAEDF3;
+}
+.metric-bar-track {
+    width: 100%;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+    margin-top: 3px;
+}
+.metric-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 400ms ease;
+}
+.confidence-overall-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     margin-bottom: 8px;
+    font-size: 0.76rem;
 }
-.confidence-label {
-    font-size: 0.78rem; font-weight: 500;
-    color: var(--text-secondary);
+.confidence-meta-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.70rem;
+    color: #5C6478;
+    margin-bottom: 6px;
 }
-.confidence-bar-track {
-    width: 100%; height: 4px; border-radius: 2px;
-    background: rgba(255,255,255,0.04);
-    overflow: hidden; margin-bottom: 6px;
+.confidence-suggestions {
+    background: rgba(52, 211, 153, 0.03);
+    border: 1px solid rgba(52, 211, 153, 0.12);
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin: 6px 0;
+    font-size: 0.74rem;
+    color: #A7F3D0;
 }
-.confidence-bar-fill {
-    height: 100%; border-radius: 2px;
-    transition: width 600ms var(--ease-smooth);
-}
-.confidence-meta {
-    font-size: 0.72rem; color: var(--text-muted);
+.confidence-suggestions ul {
+    margin: 3px 0 0 0;
+    padding-left: 16px;
 }
 .confidence-disclaimer {
-    font-style: italic; opacity: 0.8;
+    font-size: 0.68rem;
+    color: #5C6478;
+    font-style: italic;
+    line-height: 1.3;
+    margin-top: 6px;
 }
 
 /* ═══════ ONBOARDING ═══════ */
@@ -1730,66 +1884,84 @@ if not st.session_state.messages:
                     st.rerun()
 
 # ──────────────────────────────────────────────
-# Check for completed background generation results
+# Background Task State Handling
 # ──────────────────────────────────────────────
 _bg_manager = BackgroundTaskManager.get_instance()
+
+# 1. Consume completed results
 _bg_result = _bg_manager.consume_result(st.session_state.chat_id)
 if _bg_result:
-    # A background generation completed — append to messages
-    _bg_confidence = _bg_result["best_score"] if _bg_result["mode"] == "code" else None
+    _bg_confidence = _bg_result.get("best_score") if _bg_result.get("mode") == "code" else None
     st.session_state.messages.append({
         "role": "assistant",
-        "content": _bg_result["answer"],
+        "content": _bg_result.get("answer", ""),
         "sources": _bg_result.get("sources", []),
-        "mode": _bg_result["mode"],
+        "mode": _bg_result.get("mode", "code"),
         "confidence": _bg_confidence,
+        "quality_info": _bg_result.get("quality_info"),
         "context_truncated": _bg_result.get("context_truncated", False),
     })
     _save_chat(st.session_state.chat_id, st.session_state.messages)
+
+# 2. Check for failed task errors
+_bg_error = _bg_manager.clear_failed(st.session_state.chat_id)
+if _bg_error:
+    st.error(f"Generation failed: {_bg_error}")
 
 # ──────────────────────────────────────────────
 # Chat history display
 # ──────────────────────────────────────────────
 for i, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"]):
-        if msg["role"] == "assistant" and msg.get("mode"):
-            badge_html = _render_mode_badge(msg["mode"], msg.get("confidence"), len(msg.get("sources", [])))
-            if badge_html:
-                st.markdown(badge_html, unsafe_allow_html=True)
         st.markdown(msg["content"])
         if msg["role"] == "assistant":
+            # Response Confidence Indicators Panel
+            conf_panel_html = _render_confidence_panel(
+                quality_info=msg.get("quality_info"),
+                mode=msg.get("mode", "code"),
+                confidence=msg.get("confidence"),
+                source_count=len(msg.get("sources", [])),
+            )
+            if conf_panel_html:
+                st.markdown(conf_panel_html, unsafe_allow_html=True)
+
             _render_sources(msg.get("sources", []), msg.get("mode", ""))
-            if msg.get("context_truncated"):
-                st.markdown(
-                    '<div class="general-note">'
-                    '\u26a0\ufe0f <strong>Context Trimmed</strong> \u2014 '
-                    'History was truncated for this response.'
-                    '</div>',
-                    unsafe_allow_html=True,
-                )
-            # Find the user question that preceded this response
+
+            # Compression notice if any
+            comp_notice = _render_compression_notice(msg.get("context_truncated"))
+            if comp_notice:
+                st.markdown(comp_notice, unsafe_allow_html=True)
+
+            # Follow-up actions
             user_q = ""
             if i > 0 and st.session_state.messages[i-1]["role"] == "user":
                 user_q = st.session_state.messages[i-1]["content"][:60]
             _render_response_actions(i, user_q)
 
 # ──────────────────────────────────────────────
-# Background generation progress indicator
+# Active Background Generation Indicator & Polling
 # ──────────────────────────────────────────────
 if _bg_manager.is_generating(st.session_state.chat_id):
-    _bg_progress = _bg_manager.get_progress(st.session_state.chat_id)
-    st.markdown(
-        f'<div class="general-note">'
-        f'\u23f3 <strong>Generating in background...</strong> {_bg_progress}'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
-    # Auto-refresh to pick up completed results
-    time.sleep(2)
+    _bg_progress = _bg_manager.get_progress(st.session_state.chat_id) or "Processing..."
+    with st.chat_message("assistant"):
+        col_prog, col_stop = st.columns([5, 1])
+        with col_prog:
+            st.markdown(
+                f'<div style="padding:10px 14px; background:rgba(52,211,153,0.04); border:1px solid rgba(52,211,153,0.18); border-radius:8px; font-size:0.84rem; color:#6EE7B7;">'
+                f'● <strong>Generating response...</strong> {_bg_progress}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        with col_stop:
+            if st.button("Stop", key=f"stop_btn_{st.session_state.chat_id}", use_container_width=True):
+                _bg_manager.cancel(st.session_state.chat_id)
+                st.rerun()
+
+    time.sleep(0.5)
     st.rerun()
 
 # ──────────────────────────────────────────────
-# Chat input with thinking steps + streaming
+# Chat Input & Background Submission
 # ──────────────────────────────────────────────
 pending = st.session_state.pop("_pending_question", None)
 question = pending or st.chat_input("Ask about the codebase...")
@@ -1797,72 +1969,34 @@ question = pending or st.chat_input("Ask about the codebase...")
 if question:
     if not st.session_state.engine:
         st.warning("Please build an index first using the sidebar.")
+    elif _bg_manager.is_generating(st.session_state.chat_id):
+        st.warning("A generation is already in progress for this conversation. Please wait or click Stop.")
     else:
         # Capture recent history for context before appending the new user message
         history_for_ask = [
             {"question": m["content"], "answer": st.session_state.messages[i+1]["content"]}
             for i, m in enumerate(st.session_state.messages[:-1])
-            if m["role"] == "user" and st.session_state.messages[i+1]["role"] == "assistant"
+            if m["role"] == "user" and i+1 < len(st.session_state.messages) and st.session_state.messages[i+1]["role"] == "assistant"
         ]
 
         # Add user message
         st.session_state.messages.append({"role": "user", "content": question})
-        with st.chat_message("user"):
-            st.markdown(question)
-
-        # Generate answer with thinking steps
-        with st.chat_message("assistant"):
-            with st.status("Processing...", expanded=True) as status:
-                def on_progress(step_msg):
-                    st.write(f"✓ {step_msg}")
-
-                try:
-                    on_progress("Reading question...")
-                    answer, sources, mode, best_score, ctx_truncated = ask(
-                        st.session_state.engine,
-                        question,
-                        history=history_for_ask,
-                        progress_fn=on_progress,
-                        style_profile=st.session_state.get("style_profile", DEFAULT_STYLE_PROFILE),
-                    )
-                    status.update(label="Complete", state="complete", expanded=False)
-                except Exception as e:
-                    answer = f"Error generating answer: {e}"
-                    sources = []
-                    mode = "error"
-                    best_score = 0.0
-                    ctx_truncated = False
-                    status.update(label="Error", state="error", expanded=False)
-
-            # Confidence & badge
-            confidence = best_score if mode == "code" else None
-            badge_html = _render_mode_badge(mode, confidence, len(sources))
-            if badge_html:
-                st.markdown(badge_html, unsafe_allow_html=True)
-
-            st.markdown(answer)
-            _render_sources(sources, mode)
-            if ctx_truncated:
-                st.markdown(
-                    '<div class="general-note">'
-                    '\u26a0\ufe0f <strong>Context Trimmed</strong> — '
-                    'Conversation history was truncated to fit the model context window. '
-                    'Start a new chat for full context.'
-                    '</div>',
-                    unsafe_allow_html=True,
-                )
-            _render_response_actions(len(st.session_state.messages), question[:60])
-
-        # Save to history
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": answer,
-            "sources": sources,
-            "mode": mode,
-            "confidence": confidence,
-            "context_truncated": ctx_truncated,
-        })
         _save_chat(st.session_state.chat_id, st.session_state.messages)
+
+        # Submit background task
+        try:
+            _bg_manager.submit(
+                chat_id=st.session_state.chat_id,
+                question=question,
+                generate_fn=ask,
+                query_engine=st.session_state.engine,
+                history=history_for_ask,
+                style_profile=st.session_state.get("style_profile", DEFAULT_STYLE_PROFILE),
+            )
+        except Exception as e:
+            st.error(f"Failed to start generation: {e}")
+
+        st.rerun()
 
 # ──────────────────────────────────────────────
 # Footer

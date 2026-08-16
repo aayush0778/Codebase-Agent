@@ -1360,15 +1360,31 @@ components.html("""
 (function() {
     const stDoc = window.parent.document;
 
-    /* ── SPLASH CLEANUP ── */
-    var splashEl = stDoc.getElementById('cb-splash');
-    if (splashEl) {
-        setTimeout(function() {
-            var el = stDoc.getElementById('cb-splash');
-            if (el && el.parentNode) {
-                el.parentNode.removeChild(el);
+    /* ── SPLASH CONTROLLER (Zero-Flicker Single Execution Guarantee) ── */
+    try {
+        var pStorage = window.parent.sessionStorage;
+        var splashEl = stDoc.getElementById('cb-splash');
+        var alreadyShown = pStorage && pStorage.getItem('cb_splash_shown') === '1';
+
+        if (splashEl) {
+            if (alreadyShown) {
+                // Instantly remove duplicate splash if already played in this tab session
+                if (splashEl.parentNode) {
+                    splashEl.parentNode.removeChild(splashEl);
+                }
+            } else {
+                // Record in tab sessionStorage and remove after 2.6s animation completes
+                if (pStorage) pStorage.setItem('cb_splash_shown', '1');
+                setTimeout(function() {
+                    var el = stDoc.getElementById('cb-splash');
+                    if (el && el.parentNode) {
+                        el.parentNode.removeChild(el);
+                    }
+                }, 2600);
             }
-        }, 2800);
+        }
+    } catch(err) {
+        console.warn('Splash handler:', err);
     }
 
     /* ── AUTO-SCROLL ── */

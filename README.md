@@ -259,13 +259,13 @@ CodebookLM/
 
 ## 📸 Screenshots
 
-### Main Dashboard & Query Processing
+### Grounded Query & Response Confidence Indicators
 ![CodebookLM Dashboard](assets/codebooklm_dashboard.png)
-*Obsidian-dark interface with reasoning steps, system diagnostics, and real-time repository metrics.*
+*Grounded codebase query response with Response Confidence Indicators (Grounding, Coverage, Specificity, Overall Quality).*
 
-### Grounded Retrieval in Action
+### Dynamic Suggestions & Mode Attribution
 ![CodebookLM Query Response](assets/codebooklm_retrieval.png)
-*Code review style response with 94% confidence grounding, formatted code blocks, and conversation manager.*
+*Dynamic suggestions citing retrieved codebase symbols, source attribution (5 files), and General Knowledge mode fallback.*
 
 ---
 
